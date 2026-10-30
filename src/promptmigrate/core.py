@@ -12,6 +12,8 @@ import json
 import re
 import sqlite3
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -233,29 +235,38 @@ def _db_path(project_dir: Path, env: str) -> Path:
     return require_init(project_dir) / "states" / f"{env}.sqlite3"
 
 
-def _connect(project_dir: Path, env: str) -> sqlite3.Connection:
+@contextmanager
+def _connect(project_dir: Path, env: str) -> Iterator[sqlite3.Connection]:
+    """Yield an env DB connection: commit on success, roll back on error, always close."""
     path = _db_path(project_dir, env)
     path.parent.mkdir(exist_ok=True)
     connection = sqlite3.connect(path, timeout=10)
-    connection.execute("PRAGMA busy_timeout=10000")
-    connection.execute("PRAGMA synchronous=FULL")
-    connection.execute("PRAGMA foreign_keys=ON")
-    connection.execute("""
-        CREATE TABLE IF NOT EXISTS applied_revisions (
-            seq INTEGER PRIMARY KEY AUTOINCREMENT,
-            revision TEXT UNIQUE NOT NULL,
-            checksum TEXT NOT NULL,
-            applied_at TEXT NOT NULL
-        )
-    """)
-    connection.execute("""
-        CREATE TABLE IF NOT EXISTS prompts (
-            name TEXT PRIMARY KEY,
-            config TEXT NOT NULL
-        )
-    """)
-    connection.commit()
-    return connection
+    try:
+        connection.execute("PRAGMA busy_timeout=10000")
+        connection.execute("PRAGMA synchronous=FULL")
+        connection.execute("PRAGMA foreign_keys=ON")
+        connection.execute("""
+            CREATE TABLE IF NOT EXISTS applied_revisions (
+                seq INTEGER PRIMARY KEY AUTOINCREMENT,
+                revision TEXT UNIQUE NOT NULL,
+                checksum TEXT NOT NULL,
+                applied_at TEXT NOT NULL
+            )
+        """)
+        connection.execute("""
+            CREATE TABLE IF NOT EXISTS prompts (
+                name TEXT PRIMARY KEY,
+                config TEXT NOT NULL
+            )
+        """)
+        connection.commit()
+        yield connection
+        connection.commit()
+    except BaseException:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
 
 
 def _applied(db: sqlite3.Connection) -> list[tuple[str, str]]:

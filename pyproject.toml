@@ -21,8 +21,12 @@ classifiers = [
 [project.scripts]
 promptmigrate = "promptmigrate.cli:main"
 
+[project.optional-dependencies]
+dev = ["pytest>=8", "hypothesis>=6", "pytest-cov>=5"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
