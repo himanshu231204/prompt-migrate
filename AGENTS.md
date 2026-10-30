@@ -17,7 +17,7 @@ You are helping design and eventually implement **PromptMigrate**, an open-sourc
 
 - Starter commands implemented: `init`, `revision`, `history`, `diff`, `current`, `upgrade`, `downgrade`, `check`, `get`.
 - State: per-environment local SQLite files under `.promptmigrate/states/`; revisions are declarative JSON in `.promptmigrate/versions/`.
-- Test status on Windows 11 / Python 3.11: `Ran 7 tests … FAILED (errors=5)` — unclosed SQLite connections block temp-dir cleanup. Phase 1 cycle 1, PR 1 fixes this.
+- Test status on Windows 11 / Python 3.11: all tests pass after Phase 1 cycle 1 PR 1, which made every command close its SQLite connection. Run `python -m pytest -q`.
 - Do not claim `plan`, `eval`, `export`, `promote`, `reconcile`, cloud adapters, SDK, Postgres, RBAC, signed revisions, or real production activation already work.
 
 ## Engineering process
