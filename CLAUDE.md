@@ -21,7 +21,7 @@ The runtime is standard-library only (Python ≥ 3.10). Put `src` on the path; i
 
 ```bash
 python -m pip install -e ".[dev]"                            # entry point + pytest, hypothesis, pytest-cov
-python -m pytest -q                                          # all tests (what CI runs); pyproject sets pythonpath=src
+python -m pytest -q                                          # all tests (CI runs it with -v); pyproject sets pythonpath=src
 python -m pytest tests/test_core.py::PromptMigrateTests::test_state_drift_detected   # one test
 python -m pytest -k drift                                    # tests matching a name
 PYTHONPATH=src python -m unittest discover -s tests -v       # the original unittest suite still runs this way
