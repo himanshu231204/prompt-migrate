@@ -48,15 +48,18 @@ AI applications routinely deploy prompt, model, tool, and output-contract change
 
 ## Existing prototype: verified baseline
 
-A previously generated `promptmigrate-starter` source tree is present separately from this documentation pack. Its files include `src/promptmigrate/core.py`, `src/promptmigrate/cli.py`, `tests/test_core.py`, and `pyproject.toml`.
+The `promptmigrate-starter` prototype was imported into this repository unchanged on 2026-10-30: `src/promptmigrate/core.py`, `src/promptmigrate/cli.py`, `tests/test_core.py`, `pyproject.toml`.
 
-Verified on **2026-10-29** using:
+Run from the repository root:
 
 ```bash
-cd promptmigrate-starter
 PYTHONPATH=src python -m unittest discover -s tests -v
-# Ran 7 tests ... OK
 ```
+
+| Date | Platform | Result |
+|---|---|---|
+| 2026-10-29 | Linux (reported in the original handoff, not re-run here) | `Ran 7 tests ... OK` |
+| 2026-10-30 | Windows 11, Python 3.11.9 | `Ran 7 tests ... FAILED (errors=5)` — 2 pass; 5 error in temp-dir cleanup because SQLite connections are never closed (fixed by PR 1 of the cycle-1 spec) |
 
 Implemented there: `init`, `revision`, `diff`, `history`, `current`, `upgrade`, `downgrade`, `check`, `get`; Git-trackable JSON revisions; per-environment **local** SQLite files; snapshots; checksums of raw migration files at apply time; state drift detection; one linear history; multi-prompt changes in one SQLite transaction.
 

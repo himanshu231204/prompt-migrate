@@ -26,9 +26,9 @@ These tools already solve portions of **prompt versioning, labels, environment d
 
 ## Project's own existing prototype
 
-- Local `promptmigrate-starter` source tree from the previous conversation (available separately).
-- `README.md`, `ARCHITECTURE.md`, `src/promptmigrate/core.py`, `src/promptmigrate/cli.py`, `tests/test_core.py`, `pyproject.toml`.
-- Test baseline: `PYTHONPATH=src python -m unittest discover -s tests -v` → seven tests passed on 2026-10-29.
+- The `promptmigrate-starter` prototype, imported into this repository on 2026-10-30.
+- `README.md`, `docs/archive/STARTER_ARCHITECTURE.md`, `src/promptmigrate/core.py`, `src/promptmigrate/cli.py`, `tests/test_core.py`, `pyproject.toml`.
+- Test baseline: see `docs/TESTING_STRATEGY.md` (7 OK on Linux 2026-10-29; 2 pass / 5 error on Windows 2026-10-30).
 
 ## Architecture techniques (general)
 

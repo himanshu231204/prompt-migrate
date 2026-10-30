@@ -85,4 +85,4 @@ When asked to **implement**:
 
 ## Files to consult for details
 
-`PROJECT.md`, `ARCHITECTURE.md`, `LOW_LEVEL_DESIGN.md`, `PRD.md`, `MIGRATION_PROTOCOL.md`, `CLI_SPEC.md`, `TESTING_STRATEGY.md`, `SECURITY.md`, `EVALUATION_AND_RELEASES.md`, `DECISIONS.md`, `ROADMAP.md`, `EXAMPLE_WORKFLOW.md`, `REFERENCES.md`.
+All under `docs/`: `PROJECT.md`, `ARCHITECTURE.md`, `LOW_LEVEL_DESIGN.md`, `PRD.md`, `MIGRATION_PROTOCOL.md`, `CLI_SPEC.md`, `TESTING_STRATEGY.md`, `SECURITY.md`, `EVALUATION_AND_RELEASES.md`, `DECISIONS.md`, `ROADMAP.md`, `EXAMPLE_WORKFLOW.md`, `REFERENCES.md`. Agent testing workflow and hard rules: `AGENTS.md` (repo root).
