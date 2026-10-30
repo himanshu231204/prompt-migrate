@@ -6,13 +6,16 @@ You are helping design and eventually implement **PromptMigrate**, an open-sourc
 
 ## Start-of-session reading
 
-1. `README.md` (handoff and known implementation status).
-2. `PROJECT.md`, `PROBLEM_STATEMENT.md`, `COMPETITIVE_LANDSCAPE.md` (why and differentiation).
-3. `PRD.md`, `DECISIONS.md`, `OPEN_QUESTIONS.md` (scope and unsettled decisions).
-4. `ARCHITECTURE.md`, `LOW_LEVEL_DESIGN.md`, `MIGRATION_PROTOCOL.md`, `CLI_SPEC.md` (HLD/LLD and contracts).
-5. `SECURITY.md`, `TESTING_STRATEGY.md`, `EVALUATION_AND_RELEASES.md`, `IMPLEMENTATION_PLAN.md`, `ROADMAP.md`.
+Code lives in `src/promptmigrate/` and `tests/`; design docs live in `docs/`. Active specs and plans are under `docs/superpowers/`.
 
-If source code is available, inspect and run tests before proposing changes. The docs describe some **future** files/modules that do not exist yet.
+1. `README.md` (user-facing CLI overview) and `docs/HANDOFF.md` (handoff and known implementation status).
+2. `docs/PROJECT.md`, `docs/PROBLEM_STATEMENT.md`, `docs/COMPETITIVE_LANDSCAPE.md` (why and differentiation).
+3. `docs/PRD.md`, `docs/DECISIONS.md`, `docs/OPEN_QUESTIONS.md` (scope and unsettled decisions).
+4. `docs/ARCHITECTURE.md`, `docs/LOW_LEVEL_DESIGN.md`, `docs/MIGRATION_PROTOCOL.md`, `docs/CLI_SPEC.md` (HLD/LLD and contracts).
+5. `docs/SECURITY.md`, `docs/TESTING_STRATEGY.md`, `docs/EVALUATION_AND_RELEASES.md`, `docs/IMPLEMENTATION_PLAN.md`, `docs/ROADMAP.md`.
+6. The current spec in `docs/superpowers/specs/`.
+
+Inspect and run tests before proposing changes. The docs describe some **future** files/modules that do not exist yet.
 
 ## Confirmed goals
 
@@ -32,7 +35,7 @@ If source code is available, inspect and run tests before proposing changes. The
 
 ## What has actually been verified
 
-The existing starter (`promptmigrate-starter`, separate from this docs-only folder) had seven passing `unittest` tests on 2026-10-29. The current CLI commands are `init`, `revision`, `history`, `diff`, `current`, `upgrade`, `downgrade`, `check`, `get`. State is stored in per-env local SQLite databases.
+The starter prototype was imported into this repo on 2026-10-30 (`src/`, `tests/`). Its seven `unittest` tests reportedly passed on Linux on 2026-10-29. On Windows 11 / Python 3.11.9 on 2026-10-30, 2 passed and 5 errored during temp-dir cleanup, because SQLite connections are never closed. Fixing this is PR 1 of the Phase 1 hardening spec. The current CLI commands are `init`, `revision`, `history`, `diff`, `current`, `upgrade`, `downgrade`, `check`, `get`. State is stored in per-env local SQLite databases.
 
 Do not claim `plan`, `eval`, `promote`, `reconcile`, cloud adapters, production SDK, Postgres service, RBAC, signed revisions, or real production activation already work.
 

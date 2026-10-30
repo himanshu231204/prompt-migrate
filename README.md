@@ -1,75 +1,173 @@
-# PromptMigrate — Architecture & Product Handoff
+# PromptMigrate (working name)
 
-> **Working project name:** PromptMigrate  
-> **Tagline:** Alembic for production AI prompts and agent configurations.  
-> **Status:** design/handoff + an **existing local-only Python prototype**, not a production-ready deployment platform.  
-> **Updated:** 2026-10-29  
-> **Primary goal:** give Claude or another engineer enough context to critique, refine, and implement the project without changing its core intent.
+**An Alembic-inspired, migration-first CLI for production AI prompts and agent configuration.**
 
-## Read this first
+This is a working **v0.1 local prototype**, not a production deployment service. It keeps Git-tracked, immutable-in-practice revision files for JSON prompt/agent configs. The CLI applies revisions to independent SQLite environment states and rejects drift and modified, already-applied revisions. It does **not** automatically deploy to Langfuse, Foundry, OpenAI, or another runtime.
 
-**PromptMigrate is an open-source, CLI-first, migration-based control system for prompts and AI agent configuration.** It manages *ordered, reviewable, reproducible* changes through revisions with explicit dependencies, integrity checks, drift detection, environment state, upgrades, and downgrades. The long-term goal is **safe activation of complete, compatible AI configuration releases** in production.
+> **Design docs:** see [`docs/`](docs/) — start with [`docs/HANDOFF.md`](docs/HANDOFF.md). The original starter's architecture note is kept at [`docs/archive/STARTER_ARCHITECTURE.md`](docs/archive/STARTER_ARCHITECTURE.md).
 
-It is **not** another prompt editor, observability platform, chat UI, LLM gateway, or hosted prompt registry. It may integrate with those systems later.
+## Why another prompt tool?
 
-## Why build it?
+Langfuse, MLflow, Agenta, and promptctl already offer prompt versioning, management, labels, or testing. PromptMigrate is intentionally focused on an **ordered configuration migration protocol**: a migration chain with explicit predecessor revision, reversible before/after state, deterministic upgrade/downgrade behavior, environment state comparison, and CI exit codes. It could eventually integrate with those registries instead of competing with them.
 
-AI applications routinely deploy prompt, model, tool, and output-contract changes independently. Teams can lose track of what is active, introduce incompatible changes across agents, make unreviewed production edits, and struggle to reproduce or roll back an incident. Git history by itself does **not** tell you what an environment currently runs. Prompt registries already solve important parts of versioning and labels; PromptMigrate focuses on ordered **change application and environment-state verification**.
+Read:
+- https://alembic.sqlalchemy.org/en/latest/api/commands.html
+- https://langfuse.com/docs/prompt-management/overview
+- https://mlflow.org/docs/latest/prompts
+- https://agenta.ai/docs/prompt-management/overview/
 
-## Recommended reading order
+## Install
 
-| Order | File | Purpose |
-|---|---|---|
-| 1 | [PROJECT.md](PROJECT.md) | Vision, why now, users, examples, positioning |
-| 2 | [PROBLEM_STATEMENT.md](PROBLEM_STATEMENT.md) | Production failure modes and success criteria |
-| 3 | [COMPETITIVE_LANDSCAPE.md](COMPETITIVE_LANDSCAPE.md) | Existing projects and real differentiation |
-| 4 | [PRD.md](PRD.md) | Requirements, user journeys, acceptance criteria |
-| 5 | [ARCHITECTURE.md](ARCHITECTURE.md) | High-level design and deployment boundaries |
-| 6 | [LOW_LEVEL_DESIGN.md](LOW_LEVEL_DESIGN.md) | Internal components, algorithms, storage, errors |
-| 7 | [MIGRATION_PROTOCOL.md](MIGRATION_PROTOCOL.md) | Revision format, invariants, upgrade/downgrade semantics |
-| 8 | [CLI_SPEC.md](CLI_SPEC.md) | Commands and UX contract |
-| 9 | [SECURITY.md](SECURITY.md) | Threat model, non-guarantees, safeguards |
-| 10 | [TESTING_STRATEGY.md](TESTING_STRATEGY.md) | Failure injection and release criteria |
-| 11 | [EVALUATION_AND_RELEASES.md](EVALUATION_AND_RELEASES.md) | Future eval gates and release activation architecture |
-| 12 | [ROADMAP.md](ROADMAP.md) | Phased open-source delivery |
-| 13 | [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) | Recommended work breakdown and acceptance gates |
-| 14 | [DECISIONS.md](DECISIONS.md) | Decisions and recommended defaults |
-| 15 | [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md) | Architecture questions to settle |
-| 16 | [EXAMPLE_WORKFLOW.md](EXAMPLE_WORKFLOW.md) | Concrete multi-agent scenario |
-| 17 | [REFERENCES.md](REFERENCES.md) | Official inspiration and competitor sources |
-| 18 | [CLAUDE.md](CLAUDE.md) | Instructions for Claude working in this repository |
-| 19 | [CLAUDE_DISCUSSION_PROMPT.md](CLAUDE_DISCUSSION_PROMPT.md) | Ready-to-copy first conversation prompt |
-
-## Agreed direction versus recommended defaults
-
-**Agreed:** build an open-source **CLI and migration engine first**; take conceptual inspiration from Alembic; focus on production AI prompt/configuration changes; develop HLD and LLD before adding a dashboard.
-
-**Recommended defaults, not separately approved:** Python 3.10+, JSON revision artifacts, a linear dependency chain, SQLite local state, full before/after snapshots, and no provider integration in the initial MVP. These defaults match the previous starter and should be challenged only with an explicit trade-off analysis.
-
-## Existing prototype: verified baseline
-
-A previously generated `promptmigrate-starter` source tree is present separately from this documentation pack. Its files include `src/promptmigrate/core.py`, `src/promptmigrate/cli.py`, `tests/test_core.py`, and `pyproject.toml`.
-
-Verified on **2026-10-29** using:
+Python 3.10+. In this source checkout:
 
 ```bash
-cd promptmigrate-starter
-PYTHONPATH=src python -m unittest discover -s tests -v
-# Ran 7 tests ... OK
+python -m pip install -e .
 ```
 
-Implemented there: `init`, `revision`, `diff`, `history`, `current`, `upgrade`, `downgrade`, `check`, `get`; Git-trackable JSON revisions; per-environment **local** SQLite files; snapshots; checksums of raw migration files at apply time; state drift detection; one linear history; multi-prompt changes in one SQLite transaction.
+This only uses Python's standard library at runtime.
 
-**Not implemented/verified:** strict config schema, `plan`, evaluation gates, external providers, shared production ledger, centralized rollout, distributed consistency, signed artifacts, comprehensive concurrency/fault injection, audit-grade access controls. The prototype's `prod` environment name is only a *local SQLite file*, never a deployment to a production system.
+## Five-minute example
 
-## Guiding architectural rule
+In a separate empty project directory:
 
-> Separate **desired state** (drafts), **versioned state** (migrations), **applied state** (environment ledger/configuration), and **runtime active state** (what deployed applications actually resolve). Local MVP models the first three; production integration must explicitly close the gap to the fourth.
+```bash
+promptmigrate init
+# Edit .promptmigrate/drafts/assistant.json with the desired system prompt,
+# model, temperature, tool specs, response schema, etc.
+promptmigrate revision -m "initial assistant prompt"
+promptmigrate history
+promptmigrate upgrade head --env dev
+promptmigrate check --env dev --require-head
+promptmigrate get assistant --env dev
+```
 
-## Where to begin with Claude
+Then edit `.promptmigrate/drafts/assistant.json`, and run:
 
-Read [CLAUDE.md](CLAUDE.md), then paste [CLAUDE_DISCUSSION_PROMPT.md](CLAUDE_DISCUSSION_PROMPT.md) into Claude. First ask for an architecture review and gaps, not immediate wholesale implementation.
+```bash
+promptmigrate diff
+promptmigrate revision -m "strengthen refusal instructions"
+promptmigrate upgrade head --env staging
+promptmigrate current --env staging
+promptmigrate downgrade -1 --env staging
+```
 
-## License and naming
+A revision describes the change from the previous Git-tracked version, **not the state of your local dev database**. Generate a revision only after integrating the latest revisions from your team. For multi-agent systems, add more named files under `.promptmigrate/drafts/`, e.g. `planner.json`, `sql_agent.json`, or `reviewer.json`. Deleting a draft and creating a revision explicitly deletes the prompt in a target environment, with reversible history.
 
-The existing starter declares MIT. PromptMigrate remains a **working name**; check repository/package/trademark availability before public publishing. These documents are proposals; the repository implementation remains the source of truth for what actually works.
+## Example declarative migration
+
+The tool generates a JSON revision like this (abbreviated):
+
+```json
+{
+  "revision": "0123456789ab",
+  "down_revision": null,
+  "message": "initial assistant",
+  "created_at": "2026-10-29T00:00:00+00:00",
+  "changes": {
+    "assistant": {
+      "before": null,
+      "after": {
+        "messages": [{"role": "system", "content": "You are helpful."}],
+        "model": "provider/model-id",
+        "parameters": {"temperature": 0}
+      }
+    }
+  }
+}
+```
+
+`before` and `after` are **full JSON snapshots**, not executable code. This makes deterministic reversal possible but has size and Git secret-retention tradeoffs. `null` indicates absent prompt. A revision can change multiple prompts in one atomic transaction.
+
+## Commands
+
+| Command | Behavior |
+|---|---|
+| `init` | Create migration workspace and a starter draft |
+| `diff` | Compare local drafts with Git-tracked migration head |
+| `revision -m "..."` | Generate a revision from the draft changes |
+| `history` | Print revision lineage |
+| `current --env dev` | Display current revision for environment |
+| `upgrade head --env dev` | Apply pending migrations atomically |
+| `downgrade -1 --env dev` | Undo the last applied revision |
+| `downgrade base --env dev` | Revert all applied revisions |
+| `check --env dev --require-head` | Detect drift, tampered migration files, and pending changes |
+| `get assistant --env dev` | Read a local environment's active prompt config |
+
+To target a different local repository location, use the global flag `promptmigrate --project /path/to/repo history`.
+
+## Layout
+
+```text
+project/
+  .promptmigrate/
+    drafts/                # desired JSON prompt configurations (Git tracked)
+      assistant.json
+    versions/              # migrations with before/after state (Git tracked)
+      <revision>_<message>.json
+    states/                # local environment SQLite databases (gitignored)
+      dev.sqlite3
+      staging.sqlite3
+    .gitignore
+```
+
+`states/prod.sqlite3` is only a **local simulation named prod**, not a shared or production deployment state! For true multi-host environments we need a central Postgres-backed coordination service / provider adapter and an atomic activation pointer. Never mistake local SQLite files for globally deployed state.
+
+## CI example
+
+```yaml
+- run: python -m pip install -e .
+- run: python -m unittest discover -s tests -v
+- run: promptmigrate history
+- run: promptmigrate diff
+```
+
+For a real production rollout the future release pipeline must additionally run mandatory eval suites, require approval, ensure state and provider consistency, check migration drift with shared state, and only then activate the new release. A passing `check` **does not measure answer quality or prompt-injection resistance**.
+
+## Tests
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+Tests cover revision generation, history, separate environment revisions, deterministic rollback, deletion, drift detection, tampered migration files, multiple prompt migrations, and invalid environment paths.
+
+## Safety and integrity guarantees in v0.1
+
+- Entire multi-revision apply/revert transaction is atomic **inside a single local SQLite database**.
+- Migration contents are hashed when applied; editing an applied revision fails verification.
+- Unexpected in-place changes to local deployed prompts are rejected as **drift**.
+- Supported migration history is **one linear revision chain**; parallel branches require manual resolution first.
+- Config documents are pure JSON; **no arbitrary migration Python is executed**.
+- No provider API keys or network calls are required.
+
+**Not yet guaranteed:** distributed transactions with model providers; locks across hosts; remote state durability; signed revisions; user authentication/authorization; secret redaction; prompt eval gates; runtime cache invalidation; canary releases; audit-grade append-only history; automated recovery when external APIs partially fail. Never use this MVP to administer live production prompts or production secrets.
+
+## Suggested roadmap
+
+**v0.2:** evaluators (golden set / schema / security), policy-as-code gates, dry-run plan, required review approvals.
+
+**v0.3:** Postgres coordination DB, remote registry adapters, outbox + reconcile loop, reconcile/repair commands, SDK resolution by immutable release manifest.
+
+**v0.4:** signed revisions, role-based approvals, staged/canary promotion, metrics-driven rollback, runtime feature flags and cache invalidation.
+
+## Architecture direction
+
+```text
+Git drafts ─> revision generator ─> reviewed immutable revision files
+                                               |
+                                         plan + evaluation
+                                               |
+                                           approval gate
+                                               |
+                                     environment migration engine
+                                               |
+                              registry adapters + release manifest
+                                               |
+                               AI app/agent runtime resolves release
+```
+
+Prompt releases should eventually version **bundles**, not just one string: system/developer messages, model and parameters, tools, response schema, guardrails, routing metadata, and evaluation suite ID. Never place secrets in versioned content; use secret references.
+
+## License
+
+MIT. A final package/repository name should be checked for conflicts before publishing to PyPI or GitHub.
