@@ -18,15 +18,27 @@
 
 ## Phase 1 — Harden migration core (first implementation priority)
 
-- [ ] Freeze/document v0.x artifact semantics and deprecation approach.
-- [ ] Strict versioned config/revision schema.
-- [ ] Refactor core into testable modules without breaking CLI.
-- [ ] Read-only `plan` and `validate` commands.
+**Status:** in progress. Phase 1 is delivered in cycles. Finishing cycle 1 does **not** finish Phase 1.
+
+### Cycle 1 — [spec](superpowers/specs/2026-10-30-phase1-hardening-design.md) (PRs 1–6 + 3b)
+
+- [ ] Connection lifecycle fix; CI matrix across Ubuntu/Windows/macOS.
+- [ ] Characterization tests and legacy compatibility fixtures.
+- [ ] Strict parsing (duplicate keys, NaN, size/depth, symlinks), compatibility tiers, canonical equality.
+- [ ] Heuristic secret safeguard: `revision` blocks, `diff`/`get` redact, reviewed allowlist.
+- [ ] Declared environments; read commands never write.
+- [ ] Refactor core into testable modules incrementally, without breaking the CLI.
+- [ ] Read-only `plan` with a property-based plan==apply test.
+- [ ] Typed errors, exit codes 0–5, `--output json`.
+
+### Remaining after cycle 1 (cycle 2+)
+
+- [ ] Freeze v0.x artifact semantics formally; protocol v1 with canonical revision hashes (fixes the CRLF false-tamper risk).
 - [ ] Atomic revision file generation and collision handling.
-- [ ] Better typed errors and CI JSON output.
-- [ ] Path/symlink, file-size, and secret scanning safeguards.
-- [ ] Property-based and concurrency tests.
-- [ ] CI matrix/package-install smoke tests.
+- [ ] `validate` command.
+- [ ] Concurrency tests and the fault-injection suite.
+- [ ] Package-install smoke tests.
+- [ ] Append-only events table; `rebase` for unapplied revisions.
 
 **Exit:** correct, stable local CLI with comprehensive automated evidence and honest documentation.
 
