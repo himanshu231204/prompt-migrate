@@ -69,3 +69,30 @@ def test_connection_closed_when_command_fails(project, opened):
         check(project, "dev")
     assert_all_closed(opened)
     state_file(project).unlink()
+
+
+def test_failed_upgrade_rolls_back_every_write(tmp_path, monkeypatch):
+    init(tmp_path)
+    revision(tmp_path, "one")
+    draft = tmp_path / ".promptmigrate" / "drafts" / "assistant.json"
+    draft.write_text('{"messages": [{"role": "system", "content": "two"}]}', encoding="utf-8")
+    revision(tmp_path, "two")
+
+    real_canonical = core.canonical
+    calls = []
+
+    def fail_on_second_write(obj):
+        calls.append(obj)
+        if len(calls) == 2:  # revision one is written; fail while writing revision two
+            raise RuntimeError("injected write failure")
+        return real_canonical(obj)
+
+    monkeypatch.setattr(core, "canonical", fail_on_second_write)
+    with pytest.raises(RuntimeError, match="injected write failure"):
+        upgrade(tmp_path, "dev")
+    monkeypatch.undo()
+
+    assert len(calls) == 2  # the failure happened mid-transaction, after a real write
+    assert check(tmp_path, "dev") == (0, 2)  # ledger unchanged
+    with pytest.raises(MigrationError, match="No prompt named"):
+        get_config(tmp_path, "dev", "assistant")  # config table unchanged
