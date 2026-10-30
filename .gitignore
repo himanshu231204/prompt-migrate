@@ -6,3 +6,7 @@ __pycache__/
 build/
 dist/
 .promptmigrate/states/
+
+# local-only planning and tool output
+docs/superpowers/
+graphify-out/

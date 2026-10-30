@@ -15,7 +15,7 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 | Date | Platform | Result |
 |---|---|---|
 | 2026-10-29 | Linux (reported in the original handoff, not re-run here) | `Ran 7 tests ... OK` |
-| 2026-10-30 | Windows 11, Python 3.11.9 | `Ran 7 tests ... FAILED (errors=5)` — 2 pass; 5 error in temp-dir cleanup because SQLite connections are never closed (fixed by PR 1 of the cycle-1 spec) |
+| 2026-10-30 | Windows 11, Python 3.11.9 | `Ran 7 tests ... FAILED (errors=5)` — 2 pass; 5 error in temp-dir cleanup because SQLite connections are never closed (to be fixed by Phase 1 cycle 1, PR 1 — see `ROADMAP.md`) |
 
 Tests currently cover: initial revision and two environments; downgrade; checksum tampering; local drift; bad before-state preconditions; deletion/recovery; invalid environment name; no-op revision; multi-prompt revision/rollback. This is **proof of a local prototype**, not extensive production verification.
 

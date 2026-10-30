@@ -10,14 +10,14 @@ You are helping design and eventually implement **PromptMigrate**, an open-sourc
 
 - Code: `src/promptmigrate/` (currently `core.py`, `cli.py`), tests: `tests/`.
 - Design docs: `docs/` — start with `README.md` and `docs/HANDOFF.md`.
-- Active specs and plans: `docs/superpowers/specs/` (current: `2026-10-30-phase1-hardening-design.md`, Phase 1 cycle 1: PRs 1–6 + 3b; finishing it does not finish Phase 1).
+- Current scope: Phase 1 cycle 1 (PRs 1–6 + 3b) in `docs/ROADMAP.md`; finishing it does not finish Phase 1.
 - Decision record: `docs/DECISIONS.md`; open design questions: `docs/OPEN_QUESTIONS.md`.
 
 ## Verified baseline (2026-10-30)
 
 - Starter commands implemented: `init`, `revision`, `history`, `diff`, `current`, `upgrade`, `downgrade`, `check`, `get`.
 - State: per-environment local SQLite files under `.promptmigrate/states/`; revisions are declarative JSON in `.promptmigrate/versions/`.
-- Test status on Windows 11 / Python 3.11: `Ran 7 tests … FAILED (errors=5)` — unclosed SQLite connections block temp-dir cleanup. PR 1 of the Phase 1 spec fixes this.
+- Test status on Windows 11 / Python 3.11: `Ran 7 tests … FAILED (errors=5)` — unclosed SQLite connections block temp-dir cleanup. Phase 1 cycle 1, PR 1 fixes this.
 - Do not claim `plan`, `eval`, `export`, `promote`, `reconcile`, cloud adapters, SDK, Postgres, RBAC, signed revisions, or real production activation already work.
 
 ## Engineering process
@@ -48,6 +48,9 @@ You are helping design and eventually implement **PromptMigrate**, an open-sourc
 - `--env prod` is local SQLite only; never claim real production deployment.
 - Keep secrets out of revisions, logs, and test fixtures. Tests that need token-shaped values build fake ones at runtime from fragments (e.g. `"sk-" + "0" * 24`). Never commit a token-shaped literal.
 - No unnecessary dependencies; runtime stays stdlib-only (dev extras are allowed).
+- Migration **integrity** checks (`check`) are not prompt-behavior **evaluations**; never present one as the other.
+- Rollback/downgrade reverts configuration only; never claim it undoes external agent actions.
+- Future production activation = immutable release manifest + atomic pointer switch; never claim distributed ACID across remote APIs.
 
 # Testing strategy (agreed 2026-10-30)
 

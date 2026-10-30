@@ -1,88 +1,61 @@
-# CLAUDE.md — AI coding/review instructions for PromptMigrate
+# CLAUDE.md
 
-## Mission
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-You are helping design and eventually implement **PromptMigrate**, an open-source Alembic-inspired CLI for **AI prompt and agent configuration migrations**. It should provide safe ordered revisions, environment state tracking, reversible changes, integrity/drift checks, and eventually policy-gated immutable release activation. **Do not redefine it as a prompt editor, LLM workflow orchestrator, SaaS dashboard, observability tool, or a generic AI agent system.**
+## What this is
 
-## Start-of-session reading
+PromptMigrate is an Alembic-inspired, local-first Python CLI for declarative migrations of AI prompt and agent configuration. It provides ordered JSON revisions with before/after preconditions, per-environment applied state, reversible upgrade/downgrade, and integrity and drift checks. It is not a prompt editor, registry, dashboard, observability tool or agent framework.
 
-Code lives in `src/promptmigrate/` and `tests/`; design docs live in `docs/`. Active specs and plans are under `docs/superpowers/`.
+Workflow, TDD rules, hard rules and the review report format are in [`AGENTS.md`](AGENTS.md). Follow it.
 
-1. `README.md` (user-facing CLI overview) and `docs/HANDOFF.md` (handoff and known implementation status).
-2. `docs/PROJECT.md`, `docs/PROBLEM_STATEMENT.md`, `docs/COMPETITIVE_LANDSCAPE.md` (why and differentiation).
-3. `docs/PRD.md`, `docs/DECISIONS.md`, `docs/OPEN_QUESTIONS.md` (scope and unsettled decisions).
-4. `docs/ARCHITECTURE.md`, `docs/LOW_LEVEL_DESIGN.md`, `docs/MIGRATION_PROTOCOL.md`, `docs/CLI_SPEC.md` (HLD/LLD and contracts).
-5. `docs/SECURITY.md`, `docs/TESTING_STRATEGY.md`, `docs/EVALUATION_AND_RELEASES.md`, `docs/IMPLEMENTATION_PLAN.md`, `docs/ROADMAP.md`.
-6. The current spec in `docs/superpowers/specs/`.
+## Status
 
-Inspect and run tests before proposing changes. The docs describe some **future** files/modules that do not exist yet.
+- Implemented: `init`, `revision`, `history`, `diff`, `current`, `upgrade`, `downgrade`, `check`, `get`.
+- Current scope: Phase 1, cycle 1, in `docs/ROADMAP.md`.
+- `docs/` also describes future modules and commands (`plan`, `eval`, `export`, Postgres, SDK, …). They don't exist yet.
+- Windows baseline: `Ran 7 tests … FAILED (errors=5)`. SQLite connections are never closed, so temp-dir cleanup fails. Linux passes 7/7.
 
-## Confirmed goals
+## Commands
 
-- Open source; migration-first; CLI first.
-- Alembic-inspired revision history and environment applied state.
-- AI prompts/agent configurations, not DB schema migrations.
-- Design/HLD/LLD and reliability before dashboard.
+The runtime is standard-library only (Python ≥ 3.10). Put `src` on the path; installing is optional.
 
-## Recommended initial boundaries
+```bash
+python -m pip install -e .                                   # optional: `promptmigrate` entry point
+PYTHONPATH=src python -m unittest discover -s tests -v       # all tests (what CI runs)
+PYTHONPATH=src python -m unittest discover -s tests -k test_state_drift_detected   # one test
+PYTHONPATH=src python -m pytest tests/test_core.py::PromptMigrateTests::test_state_drift_detected
+PYTHONPATH=src python -m promptmigrate --project <dir> history   # CLI from source
+```
 
-- Keep Python CLI, JSON declarative revisions, linear history, and SQLite local state for MVP unless a documented ADR justifies change.
-- Deterministic migrations, no LLM calls required to apply them.
-- No arbitrary executable revision scripts in MVP.
-- No live provider integration or 'production deployment' claim in existing starter.
-- Do not confuse a local environment named `prod` with a live production target.
-- Differentiate migration **integrity** checks from prompt-behavior **evaluations**.
+- `tests/` is not a package. To run one test with unittest, use `-k`; `tests.test_core...` won't import.
+- In PowerShell, use `$env:PYTHONPATH='src'`.
+- No linter or type checker is configured.
 
-## What has actually been verified
+## Architecture
 
-The starter prototype was imported into this repo on 2026-10-30 (`src/`, `tests/`). Its seven `unittest` tests reportedly passed on Linux on 2026-10-29. On Windows 11 / Python 3.11.9 on 2026-10-30, 2 passed and 5 errored during temp-dir cleanup, because SQLite connections are never closed. Fixing this is PR 1 of the Phase 1 hardening spec. The current CLI commands are `init`, `revision`, `history`, `diff`, `current`, `upgrade`, `downgrade`, `check`, `get`. State is stored in per-env local SQLite databases.
+All logic is in `src/promptmigrate/core.py`. `cli.py` is a thin argparse dispatcher: it prints any `MigrationError`, `OSError` or `sqlite3.Error` as `Error: …` on stderr and exits 1.
 
-Do not claim `plan`, `eval`, `promote`, `reconcile`, cloud adapters, production SDK, Postgres service, RBAC, signed revisions, or real production activation already work.
+**Four states, kept distinct:**
+1. **Drafts:** `.promptmigrate/drafts/<name>.json`, the desired config (one JSON object per name).
+2. **Source history:** `.promptmigrate/versions/<12hex>_<slug>.json`. Each revision has `revision`, `down_revision`, `message`, `created_at`, and `changes: {name: {before, after}}`. These are full snapshots, and `null` means the config is absent.
+3. **Applied env state:** `.promptmigrate/states/<env>.sqlite3` (gitignored), with tables `applied_revisions(seq, revision, checksum, applied_at)` and `prompts(name, config)`.
+4. **Runtime state:** not implemented. Nothing connects SQLite state to an application, and `--env prod` is only a local file.
 
-## Design requirements
+**Cross-function flow:**
+- **`load_revisions()`** runs in almost every command. It parses all version files and enforces one linear chain: one root, no branches, no cycles. It then replays the whole chain from `{}`, so every revision's `before` must match the rebuilt state. Source history validates itself, independent of any env.
+- **`draft_diff()` / `revision()`** diff drafts against the replayed source head, never against an env DB. A deleted draft becomes an explicit delete change.
+- **`upgrade()` / `downgrade()`**:
+  - Open the env DB, run `BEGIN IMMEDIATE`, then call `_verify()`.
+  - `_verify()` requires the ledger to be an exact prefix of source history by (id, checksum), and the `prompts` rows to equal `replay(prefix)`. Anything else is drift.
+  - `_apply_changes()` then re-checks each precondition while writing.
+  - Config rows and the ledger change in one SQLite transaction.
+- **Checksums** are SHA-256 of the raw revision file bytes at apply time. Any byte change to an applied revision, including whitespace or CRLF, blocks that env. Don't change checksum or file-format semantics without an explicit format version.
+- Downgrade deletes ledger rows. There is no audit or event log yet.
+- `core.py` is the public API that tests import. Split it into modules gradually, keeping its exported names and signatures stable.
 
-- Preserve source → applied environment state distinction.
-- Preserve revision graph + before/after state preconditions.
-- Validate source history and applied state before mutation.
-- Fail closed on drift, corrupt history, unexpected state, or partial writes.
-- Keep config/ledger updates in one local SQLite transaction.
-- Plan future immutable release manifest and atomic activation pointer, not distributed ACID across remote APIs.
-- Rollback never claims to undo external agent actions.
-- Keep secrets out of source revisions and logs.
-- Prefer backward-compatible changes with explicit format versioning.
+## Conventions
 
-## Engineering process
-
-When asked to **discuss the project**:
-
-1. Restate the goal accurately.
-2. Identify architecture gaps and product differentiators.
-3. Critique assumptions, list alternatives and tradeoffs.
-4. Propose ADRs and incremental milestones.
-5. Do **not** write or change code until explicitly requested.
-
-When asked to **implement**:
-
-1. Inspect repository and current tests; state baseline.
-2. Choose a small scope from `IMPLEMENTATION_PLAN.md`.
-3. Write tests (including failure paths) before or with changes.
-4. Run the test/quality commands and report actual results.
-5. Update specs/docs if behavior changes.
-6. Clearly separate shipped behavior from planned capabilities.
-7. Avoid unnecessary dependencies, giant rewrites, or a dashboard.
-
-## Suggested first response to the user
-
-“Here is my understanding: PromptMigrate is an Alembic-style, local-first CLI for declarative AI configuration migrations with reversible history and environment drift checks. The existing starter proves the concept, but production release activation and evaluation are future phases. I will review the HLD/LLD and starter, flag contradictions or missing invariants, and propose a phased hardening plan before code.”
-
-## Report format for design/code reviews
-
-- **Verified** (directly seen in source/test result)
-- **Planned** (from these docs, not implemented)
-- **Risks / contradictions** (severity, example)
-- **Proposed ADR updates** (decision, alternatives, consequences)
-- **Next 3 implementation steps** (tests + acceptance criteria)
-
-## Files to consult for details
-
-All under `docs/`: `PROJECT.md`, `ARCHITECTURE.md`, `LOW_LEVEL_DESIGN.md`, `PRD.md`, `MIGRATION_PROTOCOL.md`, `CLI_SPEC.md`, `TESTING_STRATEGY.md`, `SECURITY.md`, `EVALUATION_AND_RELEASES.md`, `DECISIONS.md`, `ROADMAP.md`, `EXAMPLE_WORKFLOW.md`, `REFERENCES.md`. Agent testing workflow and hard rules: `AGENTS.md` (repo root).
+- Design docs are in `docs/`. Start with `docs/HANDOFF.md`, and record decisions in `docs/DECISIONS.md`.
+- `docs/superpowers/` and `graphify-out/` are local-only and gitignored. Never commit them or link to them from tracked files.
+- `.gitattributes` forces LF. Fixtures that must keep exact bytes need a `-text` rule.
+- Use one branch per PR (`phase1/prN-…`), merge locally into `main`, and don't push unless asked.

@@ -20,7 +20,7 @@
 
 **Status:** in progress. Phase 1 is delivered in cycles. Finishing cycle 1 does **not** finish Phase 1.
 
-### Cycle 1 — [spec](superpowers/specs/2026-10-30-phase1-hardening-design.md) (PRs 1–6 + 3b)
+### Cycle 1 (PRs 1–6 + 3b)
 
 - [ ] Connection lifecycle fix; CI matrix across Ubuntu/Windows/macOS.
 - [ ] Characterization tests and legacy compatibility fixtures.
