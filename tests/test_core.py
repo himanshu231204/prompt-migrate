@@ -4,6 +4,7 @@ import json
 import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
 from pathlib import Path
 
 from promptmigrate.core import (
@@ -61,7 +62,7 @@ class PromptMigrateTests(unittest.TestCase):
         revision(self.base, "initial")
         upgrade(self.base, "dev")
         db_file = self.base / ".promptmigrate" / "states" / "dev.sqlite3"
-        with sqlite3.connect(db_file) as conn:
+        with closing(sqlite3.connect(db_file)) as conn, conn:
             conn.execute("UPDATE prompts SET config=? WHERE name='assistant'", ('{}',))
         with self.assertRaisesRegex(MigrationError, "drift detected"):
             check(self.base, "dev")
