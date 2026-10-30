@@ -1,0 +1,108 @@
+# TESTING STRATEGY — Correctness before production
+
+## Testing philosophy
+
+Treat the tool as a **state transition engine** with data integrity at risk. Test invariants and failures, not merely happy-path CLI output. Use deterministic fixtures and no live LLM/API calls for core tests.
+
+## Existing baseline verified 2026-10-29
+
+```bash
+cd promptmigrate-starter
+PYTHONPATH=src python -m unittest discover -s tests -v
+# Ran 7 tests in 0.078s — OK
+```
+
+Tests currently cover: initial revision and two environments; downgrade; checksum tampering; local drift; bad before-state preconditions; deletion/recovery; invalid environment name; no-op revision; multi-prompt revision/rollback. This is **proof of a local prototype**, not extensive production verification.
+
+## Required suites
+
+### A. Unit (parser, graph, diff)
+
+- Empty repo, missing files, invalid JSON, wrong object shapes.
+- Duplicate/malformed IDs; missing root; two roots; branches; missing parent; cycles.
+- Replay deterministic regardless of file iteration order.
+- Unicode prompt content, whitespace, nested parameter changes.
+- Correct create/update/delete operations, null semantics, no-op reject.
+- Invalid prompt/config names and malicious paths.
+
+### B. State-machine / property-based
+
+- For all valid chains: applying to revision `r` yields same state as replay to `r`.
+- For all reversible chains: upgrade then downgrade to prior point yields prior state.
+- `upgrade head` twice is idempotent.
+- Permutations of independent config names do not change logical result.
+- Invariant: applied chain is always a prefix of validated source chain.
+- Error path leaves config and ledger unchanged.
+
+### C. SQLite integration
+
+- Apply 2+ revisions atomically.
+- Delete in same revision as update; rollback restores both.
+- Interrupt at checkpoints and verify rollback/no partial ledger update.
+- Simulate SQLite busy lock, connection failure, malformed DB, no write permissions.
+- Concurrent `upgrade` processes cannot corrupt state; test busy/serialization behavior.
+- Truncated/modified applied revision bytes rejected.
+- Tampered current `prompts` table and unexpected extra prompt rejected.
+
+### D. CLI contract tests
+
+- `--project` from different working directory.
+- `--help`, invalid argument/target, exit codes, stdout/stderr.
+- Commands reflect README examples exactly.
+- `diff`, `history`, `plan` (when added) do not modify state.
+- JSON output stable once published.
+
+### E. Security and limits
+
+- No API keys or bearer tokens in revisions/log output.
+- Filesystem path traversal and symlink rejection/handling.
+- Oversized and deeply nested malicious JSON.
+- Atomic file generation and collision-resistant revision IDs.
+- Arbitrary code execution attempts rejected (JSON-only).
+- Dependency/source-history modification after apply fails.
+
+### F. Future provider and production tests
+
+- Idempotent provider prepare, retry on timeout/429, partial remote failure.
+- Release manifest content hash and signature validation.
+- Postgres concurrent promotions use compare-and-swap generation.
+- Runtime never serves partial release; caches honor release pinning.
+- Rollback pointer restores previous bundle while in-flight requests remain consistent.
+- Remote drift and reconciliation do not overwrite unknown changes automatically.
+- Evaluate integration against Langfuse/MLflow where adapters exist.
+
+## Failure injection matrix
+
+| Fault | Expected outcome |
+|---|---|
+| Failure after updating one prompt but before ledger insert | Whole local SQLite transaction rolls back |
+| Applied migration file mutated | Next check/apply blocks |
+| Environment prompt manually changed | Drift error blocks |
+| Two revisions created concurrently at same source head | Detect branch; no auto-merge |
+| Unknown parent file | Reject source history |
+| External provider write fails halfway (future) | Release pointer unchanged; prepare retried/reconciled |
+| Two production CI jobs promote simultaneously (future) | At most one wins CAS; loser re-reads state |
+| Runtime cannot reach controller (future) | Serve verified pinned release per explicit cache policy |
+
+## Suggested CI stages
+
+1. Static checks / format and type checks.
+2. Unit, graph, property-based tests.
+3. SQLite integration and fault-injection tests.
+4. CLI documentation examples as executable smoke tests.
+5. Build/package install tests on Linux, macOS, Windows (when supported).
+6. Security scans and dependency checks.
+7. Future adapter/evaluation tests (separate jobs, secrets isolated).
+
+## Exit criteria for hardened v0.1
+
+- All must-have PRD acceptance cases automated.
+- No known corruption or partial commit in crash/failure tests.
+- Clear errors for invalid graph, drift, and target mismatch.
+- Documentation is accurate (local-only safety prominently stated).
+- CI green across supported Python versions/platforms.
+- Basic release artifact install/CLI smoke test works.
+
+## Metrics
+
+Record test counts/coverage and measured performance in CI when available; do not invent performance, scale limits, or coverage percentages in public docs.
