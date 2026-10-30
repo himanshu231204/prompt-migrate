@@ -1,0 +1,21 @@
+{
+  "changes": {
+    "assistant": {
+      "after": {
+        "messages": [
+          {
+            "content": "A",
+            "role": "system"
+          }
+        ],
+        "model": null,
+        "tools": {}
+      },
+      "before": null
+    }
+  },
+  "created_at": "2026-10-30T00:00:00+00:00",
+  "down_revision": null,
+  "message": "legacy: reserved fields with non-standard types",
+  "revision": "aaaaaaaaaaaa"
+}
