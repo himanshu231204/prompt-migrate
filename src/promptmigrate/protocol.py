@@ -71,6 +71,11 @@ def load_json(path: Path, *, kind: str, root: Path) -> tuple[Any, bytes, list[st
         if kind == "draft" and size > MAX_DRAFT_BYTES:
             raise SchemaError(f"{prefix} {path.name}: {size} bytes exceeds the {MAX_DRAFT_BYTES}-byte limit")
         raw = path.read_bytes()
+    except SchemaError:
+        raise
+    except RuntimeError as exc:
+        # Path.resolve() raises an untyped RuntimeError for a symlink loop on Python 3.10-3.12.
+        raise SchemaError(f"{prefix} {path.name}: symlink loop") from exc
     except OSError as exc:
         raise SchemaError(f"{prefix} {path.name}: {exc}") from exc
     if kind == "revision" and len(raw) > MAX_REVISION_BYTES:

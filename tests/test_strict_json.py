@@ -1,4 +1,5 @@
 """PR 3: strict JSON loading of drafts and revision files (tier A, plus the draft file limits)."""
+import pathlib
 import re
 
 import pytest
@@ -163,3 +164,19 @@ def test_symlinked_revision_outside_tree_rejected(project):
     message = f"Unreadable migration {A}.json: resolves outside .promptmigrate/"
     with pytest.raises(SchemaError, match=re.escape(message)):
         load_revisions(project)
+
+
+# --- symlink loops raise an untyped RuntimeError on Python 3.10-3.12 (I2) ----------------------
+
+def test_symlink_loop_in_draft_is_a_schema_error(project, monkeypatch):
+    original = pathlib.Path.resolve
+
+    def resolve(self, strict=False):
+        if self.name == "assistant.json":
+            raise RuntimeError("Symlink loop from 'x'")
+        return original(self, strict)
+
+    monkeypatch.setattr(pathlib.Path, "resolve", resolve)
+    message = "Invalid JSON draft assistant.json: symlink loop"
+    with pytest.raises(SchemaError, match=re.escape(message)):
+        draft_diff(project)

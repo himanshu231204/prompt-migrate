@@ -48,6 +48,16 @@ def test_warnings_print_before_the_error(project, monkeypatch, capsys):
     assert run(capsys, project, "history") == (1, "", "Warning: careful\nError: boom\n")
 
 
+def test_warnings_print_before_an_unhandled_exception_propagates(project, monkeypatch, capsys):
+    def failing(_project):
+        warnings.warn("careful", LegacyRevisionWarning)
+        raise RuntimeError("boom")
+    monkeypatch.setattr(cli, "load_revisions", failing)
+    with pytest.raises(RuntimeError):
+        cli.main(["--project", str(project), "history"])
+    assert capsys.readouterr().err == "Warning: careful\n"
+
+
 def test_other_warnings_pass_through_unprinted(project, monkeypatch, capsys):
     shown = []
     monkeypatch.setattr(warnings, "showwarning", lambda message, category, *args, **kwargs: shown.append(category))

@@ -42,13 +42,21 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     error = None
+    unhandled = None
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         try:
             _run(args)
         except (MigrationError, OSError, sqlite3.Error) as e:
             error = e
+        except BaseException as e:
+            # Printing here, while warnings.showwarning is still catch_warnings' own recorder, would make
+            # _print_warnings append back onto `caught` while iterating it. Defer to after the `with` exits
+            # (which restores showwarning), but still before this propagates.
+            unhandled = e
     _print_warnings(caught)
+    if unhandled is not None:
+        raise unhandled
     if error is not None:
         print(f"Error: {error}", file=sys.stderr)
         return 1
