@@ -13,6 +13,7 @@ import os
 import re
 import sqlite3
 import uuid
+import warnings
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -21,11 +22,13 @@ from pathlib import Path
 from typing import Any
 
 from .errors import (
-    DriftError, InitializationError, IntegrityError, MigrationConflictError, MigrationError, PendingRevisionsError,
-    RevisionGraphError, SchemaError, TargetError,
+    DriftError, InitializationError, IntegrityError, LegacyRevisionWarning, MigrationConflictError, MigrationError,
+    PendingRevisionsError, RevisionGraphError, SchemaError, TargetError,
 )
 from . import protocol
 from .protocol import canonical, same
+
+_LEGACY = "revision {rid}: {rule} (accepted for compatibility; create a new revision to fix)"
 
 
 @dataclass(frozen=True)
@@ -99,8 +102,9 @@ def read_drafts(project_dir: Path) -> dict[str, dict[str, Any]]:
 def load_revisions(project_dir: Path) -> list[Revision]:
     root = require_init(project_dir)
     unsorted: dict[str, Revision] = {}
+    violations: dict[str, list[str]] = {}
     for path in sorted((root / "versions").glob("*.json")):
-        item, raw, _file_rules = protocol.load_json(path, kind="revision", root=root)
+        item, raw, file_rules = protocol.load_json(path, kind="revision", root=root)
         if not isinstance(item, dict) or not all(
             k in item for k in ("revision", "down_revision", "message", "created_at", "changes")
         ):
@@ -122,6 +126,14 @@ def load_revisions(project_dir: Path) -> list[Revision]:
                     protocol.validate_config(name, change[field])
         if rid in unsorted:
             raise RevisionGraphError(f"Duplicate revision id: {rid}")
+        found = list(file_rules)
+        for name, change in changes.items():
+            if same(change["before"], change["after"]):
+                found.append(f"no-op-change {name}")
+            # Only after values: replay makes every before equal an earlier after, so each violation shows once.
+            if change["after"] is not None:
+                found.extend(protocol.config_violations(name, change["after"]))
+        violations[rid] = found
         unsorted[rid] = Revision(
             rid, parent, item["message"], item["created_at"], changes, _hash(raw), path
         )
@@ -148,6 +160,18 @@ def load_revisions(project_dir: Path) -> list[Revision]:
         raise RevisionGraphError("Disconnected or cyclic migration history")
     # Validate declarative preconditions across all revisions, independently of environments.
     replay_revisions(result)
+    names: set[str] = set()
+    for r in result:
+        for name, change in r.changes.items():
+            if change["after"] is None:
+                names.discard(name)
+            else:
+                names.add(name)
+        found = violations[r.revision]
+        found.extend(f"case-collision {group}" for group in protocol.case_collisions(names)
+                     if any(member in r.changes for member in group.split("/")))
+        for rule in found:
+            warnings.warn(_LEGACY.format(rid=r.revision, rule=rule), LegacyRevisionWarning, stacklevel=2)
     return result
 
 
@@ -215,6 +239,12 @@ def revision(project_dir: Path, message: str) -> Revision:
     size = len(text.replace("\n", os.linesep).encode("utf-8"))
     if size > protocol.MAX_REVISION_BYTES:
         raise SchemaError(f"New revision would be {size} bytes; the limit is {protocol.MAX_REVISION_BYTES}")
+    for name, change in changes.items():
+        if change["before"] is not None:
+            carried = protocol.config_violations(name, change["before"])
+            if carried:
+                warnings.warn(f"revision {rid}: {name} before carries {', '.join(carried)} from history "
+                              "(copied for compatibility)", LegacyRevisionWarning, stacklevel=2)
     root = require_init(project_dir)
     path = root / "versions" / f"{rid}_{re.sub(r'[^a-z0-9]+', '_', message.lower()).strip('_')[:50] or 'revision'}.json"
     path.write_text(text, encoding="utf-8")
