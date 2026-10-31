@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from collections.abc import Iterable
 from pathlib import Path
@@ -44,6 +45,13 @@ def _reject_constant(name: str) -> Any:
     raise _StrictJSONError(f"non-finite number {name} is not allowed")
 
 
+def _finite_float(text: str) -> float:
+    value = float(text)
+    if not math.isfinite(value):
+        raise _StrictJSONError("number out of range")
+    return value
+
+
 def load_json(path: Path, *, kind: str, root: Path) -> tuple[Any, bytes, list[str]]:
     """Strictly read one source file of `kind` ("draft" or "revision") that lives under `root` (.promptmigrate/).
 
@@ -71,7 +79,9 @@ def load_json(path: Path, *, kind: str, root: Path) -> tuple[Any, bytes, list[st
         # Drafts are decoded as UTF-8 text, so a BOM is rejected; revisions are parsed from bytes, so a BOM is
         # accepted. Both are unchanged from the starter (spec §3). A UnicodeDecodeError is a ValueError.
         document = raw.decode("utf-8") if kind == "draft" else raw
-        value = json.loads(document, object_pairs_hook=_unique_pairs, parse_constant=_reject_constant)
+        value = json.loads(
+            document, object_pairs_hook=_unique_pairs, parse_constant=_reject_constant, parse_float=_finite_float
+        )
     except RecursionError as exc:
         raise SchemaError(f"{prefix} {path.name}: nested too deep to parse") from exc
     except ValueError as exc:

@@ -5,7 +5,7 @@ import pytest
 
 from pmtest import create, pm_dir, sized_draft, symlink_or_skip, write_revision
 from promptmigrate import protocol
-from promptmigrate.core import draft_diff, load_revisions
+from promptmigrate.core import draft_diff, load_revisions, revision
 from promptmigrate.errors import SchemaError
 
 A = "a" * 12
@@ -64,6 +64,31 @@ def test_non_finite_number_in_draft(project, constant):
 def test_non_finite_number_in_revision(project):
     write_revision_text(project, REVISION % (A, "NaN"))
     with pytest.raises(SchemaError, match=re.escape(f"Unreadable migration {A}.json: non-finite number NaN")):
+        load_revisions(project)
+
+
+# --- number literals that overflow to infinity (C1, I15) ----------------------------------------
+
+@pytest.mark.parametrize("literal", ["1e400", "-1e400"])
+def test_overflowing_number_in_draft_rejected(project, literal):
+    write_draft(project, '{"x": %s}' % literal)
+    message = "Invalid JSON draft assistant.json: number out of range"
+    with pytest.raises(SchemaError, match=re.escape(message)):
+        draft_diff(project)
+
+
+def test_overflowing_draft_number_blocks_revision_without_writing(project):
+    """I15: revision() must never write Infinity to a new file."""
+    write_draft(project, '{"x": 1e400}')
+    with pytest.raises(SchemaError, match=re.escape("Invalid JSON draft assistant.json: number out of range")):
+        revision(project, "inf")
+    assert list((pm_dir(project) / "versions").iterdir()) == []
+
+
+def test_overflowing_number_in_revision_rejected(project):
+    write_revision_text(project, REVISION % (A, "1e400"))
+    message = f"Unreadable migration {A}.json: number out of range"
+    with pytest.raises(SchemaError, match=re.escape(message)):
         load_revisions(project)
 
 
