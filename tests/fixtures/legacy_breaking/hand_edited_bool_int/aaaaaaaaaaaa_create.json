@@ -1,0 +1,22 @@
+{
+  "changes": {
+    "assistant": {
+      "after": {
+        "messages": [
+          {
+            "content": "A",
+            "role": "system"
+          }
+        ],
+        "parameters": {
+          "stream": 1
+        }
+      },
+      "before": null
+    }
+  },
+  "created_at": "2026-10-30T00:00:00+00:00",
+  "down_revision": null,
+  "message": "legacy: stream as an integer",
+  "revision": "aaaaaaaaaaaa"
+}

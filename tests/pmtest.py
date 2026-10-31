@@ -1,6 +1,7 @@
 """Shared helpers for the PromptMigrate test suite (imported directly by test modules)."""
 import json
 import shutil
+import warnings
 from pathlib import Path
 
 import pytest
@@ -41,10 +42,10 @@ def set_draft(project, name, config) -> Path:
     return path
 
 
-def install_fixture(project, name) -> None:
-    """Copy tests/fixtures/legacy/<name>/*.json into the project's versions/ directory."""
-    sources = sorted((FIXTURES / "legacy" / name).glob("*.json"))
-    assert sources, f"no fixture files for {name!r}"
+def install_fixture(project, name, group="legacy") -> None:
+    """Copy tests/fixtures/<group>/<name>/*.json into the project's versions/ directory."""
+    sources = sorted((FIXTURES / group / name).glob("*.json"))
+    assert sources, f"no fixture files for {group}/{name!r}"
     for source in sources:
         shutil.copyfile(source, pm_dir(project) / "versions" / source.name)
 
@@ -93,3 +94,70 @@ GENERATED = {
     "deep_config": deep_config,
     "symlinked_revision": symlinked_revision,
 }
+
+
+def symlink_or_skip(link: Path, target: Path) -> None:
+    try:
+        link.symlink_to(target)
+    except (OSError, NotImplementedError):
+        pytest.skip("creating symlinks is not permitted for this user/platform")
+
+
+def sized_draft(project, size, name="assistant") -> Path:
+    """Write a valid draft whose file is exactly `size` bytes."""
+    skeleton = '{"messages": [{"role": "system", "content": ""}]}'
+    padding = size - len(skeleton)
+    assert padding >= 0, size
+    path = pm_dir(project) / "drafts" / f"{name}.json"
+    path.write_bytes(skeleton.replace('""', '"' + "x" * padding + '"').encode("utf-8"))
+    assert path.stat().st_size == size
+    return path
+
+
+def nested_config(depth) -> dict:
+    """A config whose nesting depth is exactly `depth` (the root object counts as 1)."""
+    config: dict = {}
+    for _ in range(depth - 1):
+        config = {"n": config}
+    return config
+
+
+LEGACY_SUFFIX = " (accepted for compatibility; create a new revision to fix)"
+
+LEGACY_WARNINGS = {
+    "case_collision": [f"revision {LEGACY_ID}: case-collision Assistant/assistant"],
+    "deep_config": [f"revision {LEGACY_ID}: config-depth assistant"],
+    "large_revision": [f"revision {LEGACY_ID}: revision-size"],
+    "noop_equal": [f"revision {'b' * 12}: no-op-change assistant"],
+    "noop_null": [f"revision {LEGACY_ID}: no-op-change ghost"],
+    "reserved_types": [
+        f"revision {LEGACY_ID}: reserved-field-type assistant.model",
+        f"revision {LEGACY_ID}: reserved-field-type assistant.tools",
+    ],
+    "secret_in_history": [],
+    "symlinked_revision": [f"revision {LEGACY_ID}: symlink"],
+}
+"""LegacyRevisionWarning messages (without LEGACY_SUFFIX) that loading each legacy fixture emits, in order."""
+
+LEGACY_NAMES = sorted(LEGACY_WARNINGS)
+
+
+def install_legacy(project, monkeypatch, name) -> None:
+    """Install one legacy fixture. For large_revision only, patch the revision-size limit below its size."""
+    if name == "large_revision":
+        from promptmigrate import protocol
+        # Between deep_config (~12 KB) and large_revision (~66 KB), so only large_revision is over the limit.
+        monkeypatch.setattr(protocol, "MAX_REVISION_BYTES", 32768)
+    if name in GENERATED:
+        GENERATED[name](project)
+    else:
+        install_fixture(project, name)
+
+
+def pm_warnings(fn, *args):
+    """Call fn(*args); return (result, messages of the PromptMigrateWarnings it emitted, in order)."""
+    from promptmigrate.errors import PromptMigrateWarning
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        result = fn(*args)
+    return result, [str(w.message) for w in caught if issubclass(w.category, PromptMigrateWarning)]
