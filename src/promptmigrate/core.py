@@ -24,6 +24,7 @@ from .errors import (
     RevisionGraphError, SchemaError, TargetError,
 )
 from . import protocol
+from .protocol import canonical, same
 
 
 @dataclass(frozen=True)
@@ -35,10 +36,6 @@ class Revision:
     changes: dict[str, dict[str, Any]]
     checksum: str
     path: Path
-
-
-def canonical(obj: Any) -> str:
-    return json.dumps(obj, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
 
 
 def pretty(obj: Any) -> str:
@@ -173,7 +170,7 @@ def _apply_changes(
     for name, change in revision.changes.items():
         expected = change["after"] if backward else change["before"]
         replacement = change["before"] if backward else change["after"]
-        if state.get(name) != expected:
+        if not same(state.get(name), expected):
             direction = "downgrade" if backward else "upgrade"
             raise MigrationConflictError(
                 f"{direction} {revision.revision}: unexpected current value for {name!r}; "
@@ -198,7 +195,7 @@ def draft_diff(project_dir: Path) -> dict[str, dict[str, Any]]:
     return {
         name: {"before": expected.get(name), "after": wanted.get(name)}
         for name in sorted(expected.keys() | wanted.keys())
-        if expected.get(name) != wanted.get(name)
+        if not same(expected.get(name), wanted.get(name))
     }
 
 
@@ -288,9 +285,9 @@ def _verify(db: sqlite3.Connection, revisions: list[Revision]) -> int:
             raise IntegrityError(f"Migration file was modified after apply: {rid}")
     expected = replay_revisions(revisions[:len(applied)])
     actual = _actual(db)
-    if actual != expected:
-        names = sorted({name for name in actual.keys() | expected.keys()
-                        if actual.get(name) != expected.get(name)})
+    names = sorted(name for name in actual.keys() | expected.keys()
+                   if not same(actual.get(name), expected.get(name)))
+    if names:
         raise DriftError(f"Environment drift detected for prompts: {', '.join(names)}")
     return len(applied)
 

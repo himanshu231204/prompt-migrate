@@ -23,7 +23,6 @@ def test_check_does_not_create_files(project):
     assert tree_snapshot(project) == before
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="1 and true compare equal; fixed in PR 3")
 def test_int_to_bool_change_is_a_diff(project):
     set_draft(project, "assistant", {"parameters": {"stream": 1}})
     revision(project, "initial")
