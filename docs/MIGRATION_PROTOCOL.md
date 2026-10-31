@@ -23,7 +23,9 @@ Named file: `.promptmigrate/drafts/sql_agent.json` (name = `sql_agent`).
 }
 ```
 
-The starter **minimally validates** the shape; `tools` and `response_schema` fields are currently treated as JSON data, not automatically enforced tool contracts. A strict schema and provider-agnostic representation are future work.
+Validation: `messages`, when present, must be a list of objects with string `role` and `content` (extra keys allowed).
+When present, `model` must be a string, `parameters` an object, `tools` a list and `response_schema` an object or `null`.
+All other keys are opaque. `tools` and `response_schema` are still JSON data, not enforced tool contracts.
 
 ## Revision artifact
 
@@ -53,7 +55,8 @@ File: `.promptmigrate/versions/b2c3d4e5f6a7_improve_sql_agent.json`
 - `before: null`, `after: object` => create.
 - `before: object`, `after: object` => update.
 - `before: object`, `after: null` => delete.
-- `before: null`, `after: null` => no-op and should be rejected by strengthened validation (not explicitly rejected by starter loader).
+- `before: null`, `after: null`, or any `before` equal to its `after` => no-op. Never generated; an existing revision
+  that contains one loads with a `LegacyRevisionWarning`.
 - A revision may contain changes for multiple named configurations.
 - `down_revision: null` indicates root; later revisions point to immediate predecessor.
 - Existing starter revision ID is 12 lowercase hex chars; file slug is cosmetic.
@@ -74,7 +77,7 @@ Let `S_i` represent the reconstructed state after revision `i`; `S_0 = {}`.
 For every config name `n` in revision `i`:
 
 ```text
-require S_(i-1)[n] == changes[n].before
+require same(S_(i-1)[n], changes[n].before)
 S_i[n] = changes[n].after
 if after == null: remove n
 ```
@@ -82,12 +85,62 @@ if after == null: remove n
 Backward step:
 
 ```text
-require S_i[n] == changes[n].after
+require same(S_i[n], changes[n].after)
 S_(i-1)[n] = changes[n].before
 if before == null: remove n
 ```
 
+`same(a, b)` means `canonical(a) == canonical(b)`, where `canonical` is
+`json.dumps(obj, sort_keys=True, ensure_ascii=False, separators=(",", ":"))`. So `1`, `1.0` and `true` are pairwise
+distinct. The same comparison is used by `diff` and by drift detection.
+
 The executor must check all preconditions before committing any state change. The whole local migration operation uses one SQLite transaction.
+
+## Strict parsing and compatibility tiers
+
+Every draft and revision file is parsed strictly:
+
+- duplicate object keys, `NaN`, `Infinity` and `-Infinity` are rejected; the error names the key or constant and the file
+- JSON nested too deep for the parser is rejected
+- a file whose resolved path is outside `.promptmigrate/` is rejected
+- drafts are read as UTF-8 text, so a UTF-8 BOM is rejected; revision files are read as bytes, so a BOM is accepted
+  (unchanged from the starter)
+
+**Limits.** "Config depth" is the nesting depth of one config: a draft's root, or one `before`/`after` value. The root
+object counts as 1.
+
+| File | Max size | Max config depth | Symlink inside `.promptmigrate/` |
+|---|---|---|---|
+| draft | 1 MiB | 64 | rejected |
+| revision being generated | 16 MiB, checked before writing | 64 per `after` | n/a |
+| existing revision file | 16 MiB | 64 per `after` | accepted |
+
+**Tiers.** Every rule is in exactly one tier.
+
+| Tier | Rules | Drafts and new revisions | Existing revision files |
+|---|---|---|---|
+| A, ambiguity | invalid JSON, duplicate keys, non-finite numbers, nesting too deep to parse, symlink leaving `.promptmigrate/`, structural rules (keys, ids, `messages`, graph, preconditions) | error | error |
+| B, hygiene and limits | the rule ids below | error | `LegacyRevisionWarning`; loading continues |
+
+| Tier-B rule id | Meaning |
+|---|---|
+| `no-op-change <name>` | a change whose `before` is the same as its `after` |
+| `case-collision <A>/<a>` | after the revision, the env holds names equal case-insensitively |
+| `reserved-field-type <name>.<field>` | `model`, `parameters`, `tools` or `response_schema` has the wrong type |
+| `config-depth <name>` | an `after` value nested deeper than 64 |
+| `revision-size` | the revision file is over 16 MiB |
+| `symlink` | the revision file is a symlink resolving inside `.promptmigrate/` |
+
+Warning text: `revision <id>: <rule> (accepted for compatibility; create a new revision to fix)`. It contains names and
+rule ids, never config values.
+
+Per-config rules are checked on `after` values only. Replay forces every `before` to equal an earlier `after`, so each
+violation is reported once, at the revision that introduced it. `before` is never validated as new content: it is a
+copy of the replayed head and must match it exactly. When `revision` copies a violating value into a new `before`, it
+warns `revision <id>: <name> before carries <rules> from history (copied for compatibility)` and still writes the file,
+because the new `after` is what fixes it.
+
+The one deliberate tier-A break: a revision hand-edited to rely on `1 == true` now fails its precondition.
 
 ## Integrity checks
 
