@@ -4,11 +4,13 @@ import argparse
 import json
 import sqlite3
 import sys
+import warnings
 from pathlib import Path
 from .core import (
     MigrationError, check, downgrade, draft_diff, get_config, init,
     load_revisions, pretty, revision, upgrade,
 )
+from .errors import PromptMigrateWarning
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -38,39 +40,61 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = build_parser()
-    args = p.parse_args(argv)
-    project = Path(args.project)
-    try:
-        if args.command == "init":
-            print(f"Initialized {init(project)}")
-        elif args.command == "revision":
-            r = revision(project, args.message)
-            print(f"Created {r.revision} (parent: {r.down_revision or 'base'}): {r.path}")
-        elif args.command == "history":
-            for r in load_revisions(project):
-                print(f"{r.revision} <- {r.down_revision or 'base'} | {r.message}")
-        elif args.command == "diff":
-            print(pretty(draft_diff(project)))
-        elif args.command == "current":
-            n, total = check(project, args.env)
-            revisions = load_revisions(project)
-            print(f"{args.env}: {revisions[n-1].revision if n else 'base'} ({n}/{total} applied)")
-        elif args.command == "upgrade":
-            ids = upgrade(project, args.env, args.target)
-            print(f"{args.env}: applied {len(ids)} revision(s): {', '.join(ids) or '(already current)'}")
-        elif args.command == "downgrade":
-            ids = downgrade(project, args.env, args.target)
-            print(f"{args.env}: reverted {len(ids)} revision(s): {', '.join(ids) or '(nothing to revert)'}")
-        elif args.command == "check":
-            n, total = check(project, args.env, args.require_head)
-            print(f"OK: {args.env} is consistent ({n}/{total} revisions applied)")
-        elif args.command == "get":
-            print(pretty(get_config(project, args.env, args.name)), end="")
-        return 0
-    except (MigrationError, OSError, sqlite3.Error) as e:
-        print(f"Error: {e}", file=sys.stderr)
+    args = build_parser().parse_args(argv)
+    error = None
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        try:
+            _run(args)
+        except (MigrationError, OSError, sqlite3.Error) as e:
+            error = e
+    _print_warnings(caught)
+    if error is not None:
+        print(f"Error: {error}", file=sys.stderr)
         return 1
+    return 0
+
+
+def _print_warnings(caught: list[warnings.WarningMessage]) -> None:
+    """Print each distinct PromptMigrate warning once, in first-seen order; pass other warnings through."""
+    seen = set()
+    for w in caught:
+        if not issubclass(w.category, PromptMigrateWarning):
+            warnings.showwarning(w.message, w.category, w.filename, w.lineno)
+            continue
+        key = (w.category, str(w.message))
+        if key not in seen:
+            seen.add(key)
+            print(f"Warning: {w.message}", file=sys.stderr)
+
+
+def _run(args: argparse.Namespace) -> None:
+    project = Path(args.project)
+    if args.command == "init":
+        print(f"Initialized {init(project)}")
+    elif args.command == "revision":
+        r = revision(project, args.message)
+        print(f"Created {r.revision} (parent: {r.down_revision or 'base'}): {r.path}")
+    elif args.command == "history":
+        for r in load_revisions(project):
+            print(f"{r.revision} <- {r.down_revision or 'base'} | {r.message}")
+    elif args.command == "diff":
+        print(pretty(draft_diff(project)))
+    elif args.command == "current":
+        n, total = check(project, args.env)
+        revisions = load_revisions(project)
+        print(f"{args.env}: {revisions[n-1].revision if n else 'base'} ({n}/{total} applied)")
+    elif args.command == "upgrade":
+        ids = upgrade(project, args.env, args.target)
+        print(f"{args.env}: applied {len(ids)} revision(s): {', '.join(ids) or '(already current)'}")
+    elif args.command == "downgrade":
+        ids = downgrade(project, args.env, args.target)
+        print(f"{args.env}: reverted {len(ids)} revision(s): {', '.join(ids) or '(nothing to revert)'}")
+    elif args.command == "check":
+        n, total = check(project, args.env, args.require_head)
+        print(f"OK: {args.env} is consistent ({n}/{total} revisions applied)")
+    elif args.command == "get":
+        print(pretty(get_config(project, args.env, args.name)), end="")
 
 
 if __name__ == "__main__":
