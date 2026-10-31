@@ -1,4 +1,7 @@
-"""PR 2: known bugs pinned as strict xfails. Each reason names the PR that fixes it."""
+"""PR 2: known bugs pinned as strict xfails, each naming the PR that fixes it.
+
+PR 3 fixed duplicate keys, NaN and 1/true equality; those tests are now plain regression tests.
+"""
 import pytest
 
 from pmtest import pm_dir, set_draft, tree_snapshot
@@ -20,7 +23,6 @@ def test_check_does_not_create_files(project):
     assert tree_snapshot(project) == before
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="1 and true compare equal; fixed in PR 3")
 def test_int_to_bool_change_is_a_diff(project):
     set_draft(project, "assistant", {"parameters": {"stream": 1}})
     revision(project, "initial")
@@ -28,14 +30,12 @@ def test_int_to_bool_change_is_a_diff(project):
     assert draft_diff(project)
 
 
-@pytest.mark.xfail(strict=True, raises=pytest.fail.Exception, reason="duplicate JSON keys accepted; fixed in PR 3")
 def test_duplicate_keys_rejected(project):
     (pm_dir(project) / "drafts" / "assistant.json").write_text('{"model": "a", "model": "b"}', encoding="utf-8")
     with pytest.raises(MigrationError):
         draft_diff(project)
 
 
-@pytest.mark.xfail(strict=True, raises=pytest.fail.Exception, reason="NaN accepted; fixed in PR 3")
 def test_nan_rejected(project):
     (pm_dir(project) / "drafts" / "assistant.json").write_text('{"x": NaN}', encoding="utf-8")
     with pytest.raises(MigrationError):

@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import sqlite3
 import uuid
+import warnings
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -19,9 +21,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .errors import (
+    DriftError, InitializationError, IntegrityError, LegacyRevisionWarning, MigrationConflictError, MigrationError,
+    PendingRevisionsError, RevisionGraphError, SchemaError, TargetError,
+)
+from . import protocol
+from .protocol import canonical, same
 
-class MigrationError(Exception):
-    """An invalid revision, unexpected environment state, or unsafe operation."""
+_LEGACY = "revision {rid}: {rule} (accepted for compatibility; create a new revision to fix)"
 
 
 @dataclass(frozen=True)
@@ -33,10 +40,6 @@ class Revision:
     changes: dict[str, dict[str, Any]]
     checksum: str
     path: Path
-
-
-def canonical(obj: Any) -> str:
-    return json.dumps(obj, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
 
 
 def pretty(obj: Any) -> str:
@@ -54,14 +57,14 @@ def root_dir(project_dir: Path) -> Path:
 def require_init(project_dir: Path) -> Path:
     root = root_dir(project_dir)
     if not (root / "versions").is_dir() or not (root / "drafts").is_dir():
-        raise MigrationError("Not initialized. Run: promptmigrate init")
+        raise InitializationError("Not initialized. Run: promptmigrate init")
     return root
 
 
 def init(project_dir: Path) -> Path:
     root = root_dir(project_dir)
     if root.exists():
-        raise MigrationError(f"Already exists: {root}")
+        raise InitializationError(f"Already exists: {root}")
     (root / "versions").mkdir(parents=True)
     (root / "drafts").mkdir()
     (root / "states").mkdir()
@@ -77,23 +80,6 @@ def init(project_dir: Path) -> Path:
     return root
 
 
-def _validate_prompt(name: str, value: Any) -> None:
-    if not re.fullmatch(r"[a-zA-Z][a-zA-Z0-9_-]{0,127}", name):
-        raise MigrationError(f"Invalid prompt name: {name!r}")
-    if not isinstance(value, dict):
-        raise MigrationError(f"Prompt {name!r} must contain a JSON object")
-    # Minimal structural validation; intentionally no framework-specific constraints.
-    if "messages" in value:
-        msgs = value["messages"]
-        if not isinstance(msgs, list) or any(
-            not isinstance(msg, dict)
-            or not isinstance(msg.get("role"), str)
-            or not isinstance(msg.get("content"), str)
-            for msg in msgs
-        ):
-            raise MigrationError(f"Prompt {name!r} has invalid messages")
-
-
 def read_drafts(project_dir: Path) -> dict[str, dict[str, Any]]:
     root = require_init(project_dir)
     drafts = {}
@@ -101,45 +87,53 @@ def read_drafts(project_dir: Path) -> dict[str, dict[str, Any]]:
         if path.is_dir() or path.suffix != ".json":
             continue
         name = path.stem
-        try:
-            value = json.loads(path.read_text(encoding="utf-8"))
-        except (ValueError, OSError) as exc:
-            raise MigrationError(f"Invalid JSON draft {path.name}: {exc}") from exc
-        _validate_prompt(name, value)
+        value, _raw, _rules = protocol.load_json(path, kind="draft", root=root)
+        protocol.validate_config(name, value)
+        found = protocol.config_violations(name, value)
+        if found:
+            raise SchemaError(f"Invalid draft {path.name}: {', '.join(found)}")
         drafts[name] = value
+    collisions = protocol.case_collisions(drafts)
+    if collisions:
+        raise SchemaError(f"Invalid drafts: case-collision {collisions[0]}")
     return drafts
 
 
 def load_revisions(project_dir: Path) -> list[Revision]:
     root = require_init(project_dir)
     unsorted: dict[str, Revision] = {}
+    violations: dict[str, list[str]] = {}
     for path in sorted((root / "versions").glob("*.json")):
-        raw = path.read_bytes()
-        try:
-            item = json.loads(raw)
-        except (ValueError, OSError) as exc:
-            raise MigrationError(f"Unreadable migration {path.name}: {exc}") from exc
+        item, raw, file_rules = protocol.load_json(path, kind="revision", root=root)
         if not isinstance(item, dict) or not all(
             k in item for k in ("revision", "down_revision", "message", "created_at", "changes")
         ):
-            raise MigrationError(f"Invalid migration format: {path.name}")
+            raise SchemaError(f"Invalid migration format: {path.name}")
         rid, parent, changes = item["revision"], item["down_revision"], item["changes"]
         if not isinstance(rid, str) or not re.fullmatch(r"[a-f0-9]{12}", rid):
-            raise MigrationError(f"Invalid revision id in {path.name}")
+            raise SchemaError(f"Invalid revision id in {path.name}")
         if parent is not None and (not isinstance(parent, str) or not re.fullmatch(r"[a-f0-9]{12}", parent)):
-            raise MigrationError(f"Invalid down_revision in {path.name}")
+            raise SchemaError(f"Invalid down_revision in {path.name}")
         if not isinstance(item["message"], str) or not isinstance(item["created_at"], str):
-            raise MigrationError(f"Invalid metadata in {path.name}")
+            raise SchemaError(f"Invalid metadata in {path.name}")
         if not isinstance(changes, dict) or not changes:
-            raise MigrationError(f"Migration must contain nonempty changes: {path.name}")
+            raise SchemaError(f"Migration must contain nonempty changes: {path.name}")
         for name, change in changes.items():
             if not isinstance(change, dict) or set(change) != {"before", "after"}:
-                raise MigrationError(f"Invalid change operation in {path.name}: {name}")
+                raise SchemaError(f"Invalid change operation in {path.name}: {name}")
             for field in ("before", "after"):
                 if change[field] is not None:
-                    _validate_prompt(name, change[field])
+                    protocol.validate_config(name, change[field])
         if rid in unsorted:
-            raise MigrationError(f"Duplicate revision id: {rid}")
+            raise RevisionGraphError(f"Duplicate revision id: {rid}")
+        found = list(file_rules)
+        for name, change in changes.items():
+            if same(change["before"], change["after"]):
+                found.append(f"no-op-change {name}")
+            # Only after values: replay makes every before equal an earlier after, so each violation shows once.
+            if change["after"] is not None:
+                found.extend(protocol.config_violations(name, change["after"]))
+        violations[rid] = found
         unsorted[rid] = Revision(
             rid, parent, item["message"], item["created_at"], changes, _hash(raw), path
         )
@@ -148,24 +142,36 @@ def load_revisions(project_dir: Path) -> list[Revision]:
         return []
     roots = [r for r in unsorted.values() if r.down_revision is None]
     if len(roots) != 1:
-        raise MigrationError("MVP requires exactly one root revision (linear history)")
+        raise RevisionGraphError("MVP requires exactly one root revision (linear history)")
     children: dict[str, list[Revision]] = {}
     for r in unsorted.values():
         if r.down_revision is not None:
             if r.down_revision not in unsorted:
-                raise MigrationError(f"Missing parent of revision {r.revision}: {r.down_revision}")
+                raise RevisionGraphError(f"Missing parent of revision {r.revision}: {r.down_revision}")
             children.setdefault(r.down_revision, []).append(r)
     if any(len(kids) > 1 for kids in children.values()):
-        raise MigrationError("Branching detected. MVP only supports one linear head; resolve in Git before deploying")
+        raise RevisionGraphError("Branching detected. MVP only supports one linear head; resolve in Git before deploying")
     result = []
     current = roots[0]
     while current is not None and current.revision not in {r.revision for r in result}:
         result.append(current)
         current = children.get(current.revision, [None])[0]
     if len(result) != len(unsorted):
-        raise MigrationError("Disconnected or cyclic migration history")
+        raise RevisionGraphError("Disconnected or cyclic migration history")
     # Validate declarative preconditions across all revisions, independently of environments.
     replay_revisions(result)
+    names: set[str] = set()
+    for r in result:
+        for name, change in r.changes.items():
+            if change["after"] is None:
+                names.discard(name)
+            else:
+                names.add(name)
+        found = violations[r.revision]
+        found.extend(f"case-collision {group}" for group in protocol.case_collisions(names)
+                     if any(member in r.changes for member in group.split("/")))
+        for rule in found:
+            warnings.warn(_LEGACY.format(rid=r.revision, rule=rule), LegacyRevisionWarning, stacklevel=2)
     return result
 
 
@@ -178,9 +184,9 @@ def _apply_changes(
     for name, change in revision.changes.items():
         expected = change["after"] if backward else change["before"]
         replacement = change["before"] if backward else change["after"]
-        if state.get(name) != expected:
+        if not same(state.get(name), expected):
             direction = "downgrade" if backward else "upgrade"
-            raise MigrationError(
+            raise MigrationConflictError(
                 f"{direction} {revision.revision}: unexpected current value for {name!r}; "
                 "possible drift or invalid revision dependency"
             )
@@ -203,19 +209,24 @@ def draft_diff(project_dir: Path) -> dict[str, dict[str, Any]]:
     return {
         name: {"before": expected.get(name), "after": wanted.get(name)}
         for name in sorted(expected.keys() | wanted.keys())
-        if expected.get(name) != wanted.get(name)
+        if not same(expected.get(name), wanted.get(name))
     }
 
 
 def revision(project_dir: Path, message: str) -> Revision:
     if not message.strip():
-        raise MigrationError("Revision message cannot be empty")
+        raise SchemaError("Revision message cannot be empty")
     all_revisions = load_revisions(project_dir)
     changes = draft_diff(project_dir)
     if not changes:
-        raise MigrationError("No changes between drafts and migration head")
+        raise SchemaError("No changes between drafts and migration head")
     rid = uuid.uuid4().hex[:12]
     parent = all_revisions[-1].revision if all_revisions else None
+    for name, change in changes.items():
+        if change["after"] is not None:
+            found = protocol.config_violations(name, change["after"])
+            if found:
+                raise SchemaError(f"New revision would be invalid: {', '.join(found)}")
     item = {
         "revision": rid,
         "down_revision": parent,
@@ -223,15 +234,26 @@ def revision(project_dir: Path, message: str) -> Revision:
         "created_at": datetime.now(timezone.utc).isoformat(),
         "changes": changes,
     }
+    text = pretty(item)
+    # write_text translates "\n" to os.linesep, so this is the exact size of the file it writes.
+    size = len(text.replace("\n", os.linesep).encode("utf-8"))
+    if size > protocol.MAX_REVISION_BYTES:
+        raise SchemaError(f"New revision would be {size} bytes; the limit is {protocol.MAX_REVISION_BYTES}")
+    for name, change in changes.items():
+        if change["before"] is not None:
+            carried = protocol.config_violations(name, change["before"])
+            if carried:
+                warnings.warn(f"revision {rid}: {name} before carries {', '.join(carried)} from history "
+                              "(copied for compatibility)", LegacyRevisionWarning, stacklevel=2)
     root = require_init(project_dir)
     path = root / "versions" / f"{rid}_{re.sub(r'[^a-z0-9]+', '_', message.lower()).strip('_')[:50] or 'revision'}.json"
-    path.write_text(pretty(item), encoding="utf-8")
+    path.write_text(text, encoding="utf-8")
     return load_revisions(project_dir)[-1]
 
 
 def _db_path(project_dir: Path, env: str) -> Path:
     if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{0,63}", env):
-        raise MigrationError("Environment must be alphanumeric, starting with a letter")
+        raise SchemaError("Environment must be alphanumeric, starting with a letter")
     return require_init(project_dir) / "states" / f"{env}.sqlite3"
 
 
@@ -284,19 +306,19 @@ def _actual(db: sqlite3.Connection) -> dict[str, dict[str, Any]]:
 def _verify(db: sqlite3.Connection, revisions: list[Revision]) -> int:
     applied = _applied(db)
     if len(applied) > len(revisions):
-        raise MigrationError("Environment contains more applied revisions than source history")
+        raise IntegrityError("Environment contains more applied revisions than source history")
     for index, (rid, checksum) in enumerate(applied):
         source = revisions[index]
         if rid != source.revision:
-            raise MigrationError(f"Applied revisions diverge from source history at index {index}")
+            raise IntegrityError(f"Applied revisions diverge from source history at index {index}")
         if checksum != source.checksum:
-            raise MigrationError(f"Migration file was modified after apply: {rid}")
+            raise IntegrityError(f"Migration file was modified after apply: {rid}")
     expected = replay_revisions(revisions[:len(applied)])
     actual = _actual(db)
-    if actual != expected:
-        names = sorted({name for name in actual.keys() | expected.keys()
-                        if actual.get(name) != expected.get(name)})
-        raise MigrationError(f"Environment drift detected for prompts: {', '.join(names)}")
+    names = sorted(name for name in actual.keys() | expected.keys()
+                   if not same(actual.get(name), expected.get(name)))
+    if names:
+        raise DriftError(f"Environment drift detected for prompts: {', '.join(names)}")
     return len(applied)
 
 
@@ -305,7 +327,7 @@ def check(project_dir: Path, env: str, require_head: bool = False) -> tuple[int,
     with _connect(project_dir, env) as db:
         count = _verify(db, revisions)
     if require_head and count != len(revisions):
-        raise MigrationError(f"Environment is behind head: {len(revisions) - count} pending revisions")
+        raise PendingRevisionsError(f"Environment is behind head: {len(revisions) - count} pending revisions")
     return count, len(revisions)
 
 
@@ -313,13 +335,13 @@ def upgrade(project_dir: Path, env: str, target: str = "head") -> list[str]:
     revisions = load_revisions(project_dir)
     targets = [r.revision for r in revisions]
     if target != "head" and target not in targets:
-        raise MigrationError(f"Unknown target revision: {target}")
+        raise TargetError(f"Unknown target revision: {target}")
     target_count = len(revisions) if target == "head" else targets.index(target) + 1
     with _connect(project_dir, env) as db:
         db.execute("BEGIN IMMEDIATE")
         applied_count = _verify(db, revisions)
         if applied_count > target_count:
-            raise MigrationError("Upgrade target is behind current revision; use downgrade")
+            raise TargetError("Upgrade target is behind current revision; use downgrade")
         state = _actual(db)
         for r in revisions[applied_count:target_count]:
             _apply_changes(state, r)
@@ -353,9 +375,9 @@ def downgrade(project_dir: Path, env: str, target: str = "-1") -> list[str]:
         elif target in targets:
             target_count = targets.index(target) + 1
         else:
-            raise MigrationError(f"Unknown target revision: {target}")
+            raise TargetError(f"Unknown target revision: {target}")
         if target_count > applied_count:
-            raise MigrationError("Downgrade target is ahead of current revision; use upgrade")
+            raise TargetError("Downgrade target is ahead of current revision; use upgrade")
         state = _actual(db)
         reversed_revisions = list(reversed(revisions[target_count:applied_count]))
         for r in reversed_revisions:
@@ -380,5 +402,5 @@ def get_config(project_dir: Path, env: str, name: str) -> dict[str, Any]:
         _verify(db, revisions)
         row = db.execute("SELECT config FROM prompts WHERE name=?", (name,)).fetchone()
     if not row:
-        raise MigrationError(f"No prompt named {name!r} in environment {env!r}")
+        raise TargetError(f"No prompt named {name!r} in environment {env!r}")
     return json.loads(row[0])

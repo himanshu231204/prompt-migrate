@@ -62,6 +62,7 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 | 2026-10-30 | Windows 11, Python 3.11.9 | `Ran 7 tests ... FAILED (errors=5)` — 2 pass; 5 error in temp-dir cleanup because SQLite connections are never closed (to be fixed by Phase 1 cycle 1, PR 1 — see `ROADMAP.md`) |
 | 2026-10-30 (after PR 1) | Windows 11, Python 3.11.9 | `python -m pytest -q` → `17 passed`; unittest → original 7 `OK` |
 | 2026-10-30 (after PR 2) | Windows 11, Python 3.11.9 | `python -m pytest -q` → `45 passed, 1 skipped, 5 xfailed` |
+| 2026-10-31 (after PR 3) | Windows 11, Python 3.11.9 | `python -m pytest -q` → `147 passed, 7 skipped, 2 xfailed` |
 
 Implemented there: `init`, `revision`, `diff`, `history`, `current`, `upgrade`, `downgrade`, `check`, `get`; Git-trackable JSON revisions; per-environment **local** SQLite files; snapshots; checksums of raw migration files at apply time; state drift detection; one linear history; multi-prompt changes in one SQLite transaction.
 

@@ -9,7 +9,7 @@ Familiar to Alembic users, transparent in CI, safe by default. Commands distingu
 | Command | Purpose | Important behavior |
 |---|---|---|
 | `promptmigrate init` | Scaffold project | Creates `.promptmigrate/` and starter `assistant.json` |
-| `promptmigrate revision -m "message"` | Generate revision from draft delta | Rejects no-op; parent = source head |
+| `promptmigrate revision -m "message"` | Generate revision from draft delta | Rejects no-op; parent = source head; refuses drafts that break validation or limits before writing |
 | `promptmigrate diff` | Compare drafts with source migration head | JSON diff to stdout; not env diff |
 | `promptmigrate history` | Print ordered source revisions | Shows ID, parent, message |
 | `promptmigrate current --env dev` | Show env applied head | Verifies local state first |
@@ -59,7 +59,14 @@ promptmigrate downgrade -1 --env staging
 
 ## Errors and exit status
 
-**Current baseline:** `0` on success, `1` for handled domain/storage errors. Argument parsing follows `argparse` behavior (typically `2` for usage failures). Do not claim detailed exit-code taxonomy exists yet.
+**Current baseline:** `0` on success, `1` for handled domain/storage errors. Argument parsing follows `argparse` behavior
+(typically `2` for usage failures). Handled errors are typed (`SchemaError`, `RevisionGraphError`,
+`MigrationConflictError`, `DriftError`, `IntegrityError`, `TargetError`, `PendingRevisionsError`, `InitializationError`,
+all subclasses of `MigrationError`); the detailed exit-code mapping arrives with the JSON contract.
+
+**Warnings:** each distinct warning is printed once per invocation to stderr as `Warning: <message>`, before any
+`Error: …` line. Warnings never change the exit code. Today the only warning is the legacy-revision warning for existing
+revision files that break a tier-B rule (see `MIGRATION_PROTOCOL.md`, "Strict parsing and compatibility tiers").
 
 **Proposed taxonomy:** `0` success, `2` usage, `3` invalid source/schema, `4` drift/integrity conflict, `5` lock/storage problem, `6` evaluation gate failure, `7` provider error. Introduce only after contract tests and documentation update.
 

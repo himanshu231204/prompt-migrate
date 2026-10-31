@@ -23,6 +23,13 @@ Each ADR documents a decision and its rationale. **Confirmed** means the convers
 **Why:** readable Git diffs, deterministic replay, safer review.  
 **Tradeoff:** larger files, schema evolution, need to scan for secrets.
 
+## ADR-003a — Canonical equality
+
+**Status:** implemented (Phase 1 cycle 1, PR 3).  
+**Decision:** configs are compared by canonical JSON in preconditions, `diff` and drift detection. `1`, `1.0` and `true` are distinct.  
+**Why:** Python `==` treats `1 == 1.0 == True`, so a `1` → `true` edit produced no revision and bool/int drift in an env DB went unnoticed.  
+**Consequence:** a revision hand-edited to rely on the conflation fails closed. Generated revisions and env DBs are unaffected, because JSON number types survive parsing and storage.
+
 ## ADR-004 — Linear revisions in MVP
 
 **Status:** recommended and implemented in starter.  
@@ -70,3 +77,10 @@ Each ADR documents a decision and its rationale. **Confirmed** means the convers
 **Status:** provisional.  
 **Decision:** use PromptMigrate until naming checks. Prototype version `0.1.0` doesn't imply production maturity.  
 **Consequence:** review PyPI/GitHub/trademark names before public release.
+
+## ADR-020 — Compatibility tiers for validation rules
+
+**Status:** implemented (Phase 1 cycle 1, PR 3).  
+**Decision:** tier A (ambiguous or unsafe input) fails closed everywhere. Tier B (hygiene and limits) is enforced on drafts and newly generated revisions, and only warned about (`LegacyRevisionWarning`) in existing revision files.  
+**Why:** existing histories can legitimately break rules the starter never had. Rejecting them would block every command, including the `downgrade` needed to recover.  
+**Consequence:** `before` values are never validated as new content. Per-config rules are reported once, at the revision whose `after` introduced the violation. Non-finite numbers, including literals that overflow to infinity, are tier A in revision files too. The starter wrote `Infinity` for an overflowing draft number, so such a history now fails closed and must be corrected by hand.
