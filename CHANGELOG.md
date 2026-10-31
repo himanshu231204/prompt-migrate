@@ -6,8 +6,10 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
 
 ### Phase 1 cycle 1 — PR 3: strict parsing, compatibility tiers, canonical equality
 
-- **Contract:** drafts and revision files are parsed strictly. Duplicate keys, `NaN`/`Infinity`/`-Infinity`, JSON
-  nested too deep to parse, and files that resolve outside `.promptmigrate/` are rejected everywhere (tier A).
+- **Contract:** drafts and revision files are parsed strictly. Duplicate keys, `NaN`/`Infinity`/`-Infinity`, number
+  literals that overflow to infinity (such as `1e400`), JSON nested too deep to parse, and files that resolve outside
+  `.promptmigrate/` are rejected everywhere (tier A). This also applies when `versions/` or `drafts/` is itself a
+  symlink pointing outside `.promptmigrate/`: every file in it is rejected.
 - **Contract:** configs compare by canonical JSON, so `1`, `1.0` and `true` are distinct. A `1` → `true` draft edit
   now produces a revision, and bool/int drift in an env DB is detected. A revision hand-edited to rely on the old
   conflation now fails with `unexpected current value`.
@@ -18,7 +20,8 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
   `Warning: revision <id>: <rule> (accepted for compatibility; create a new revision to fix)` on stderr.
 - Errors are typed (`InitializationError`, `SchemaError`, `RevisionGraphError`, `MigrationConflictError`,
   `DriftError`, `IntegrityError`, `TargetError`, `PendingRevisionsError`), all subclasses of `MigrationError`.
-  Messages and exit code 1 are unchanged until PR 6.
+  Messages and exit code 1 are unchanged until PR 6, except that an OS error while reading a revision file is now
+  reported as `Unreadable migration <file>: …`.
 - New modules `promptmigrate.errors` and `promptmigrate.protocol`; `promptmigrate.core` keeps every existing name.
 - Tests: the three PR 3 strict xfails now pass; added error-type, strict-parsing, canonical-equality, new-content,
   legacy-warning and CLI-warning suites, plus `tests/fixtures/legacy_breaking/hand_edited_bool_int`.

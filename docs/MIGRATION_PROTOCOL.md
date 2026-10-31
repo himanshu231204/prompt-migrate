@@ -100,9 +100,13 @@ The executor must check all preconditions before committing any state change. Th
 
 Every draft and revision file is parsed strictly:
 
-- duplicate object keys, `NaN`, `Infinity` and `-Infinity` are rejected; the error names the key or constant and the file
+- duplicate object keys, `NaN`, `Infinity` and `-Infinity` are rejected; the error names the key or constant and the
+  file. This also covers number literals that overflow to infinity, such as `1e400`: the error names the file but
+  never the literal
 - JSON nested too deep for the parser is rejected
-- a file whose resolved path is outside `.promptmigrate/` is rejected
+- a file whose resolved path is outside `.promptmigrate/` is rejected. This also applies when `versions/` or
+  `drafts/` is itself a symlink pointing outside `.promptmigrate/`: every file in it resolves outside and is
+  rejected
 - drafts are read as UTF-8 text, so a UTF-8 BOM is rejected; revision files are read as bytes, so a BOM is accepted
   (unchanged from the starter)
 
