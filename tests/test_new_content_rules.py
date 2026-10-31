@@ -3,9 +3,9 @@ import re
 
 import pytest
 
-from pmtest import CFG, nested_config, pm_dir, set_draft
+from pmtest import CFG, nested_config, pm_dir, pm_warnings, set_draft
 from promptmigrate import core, protocol
-from promptmigrate.core import draft_diff, revision
+from promptmigrate.core import draft_diff, load_revisions, revision
 from promptmigrate.errors import SchemaError
 
 
@@ -67,6 +67,25 @@ def test_revision_over_size_limit_refused_before_writing(project, monkeypatch):
     with pytest.raises(SchemaError, match=r"New revision would be \d+ bytes; the limit is 100"):
         revision(project, "initial")
     assert versions(project) == []
+
+
+def test_revision_size_limit_checked_against_real_file_size(project, monkeypatch):
+    """D5: the pre-write size check (test_revision_over_size_limit_refused_before_writing) is pinned against
+    the real on-disk file size, not a tautological guess at it."""
+    r = revision(project, "initial")
+    size = r.path.stat().st_size
+    r.path.unlink()
+
+    # isoformat() drops the 7-character microseconds part when microseconds is 0, so the real size can
+    # vary by up to 7 bytes between runs; the 8-byte margin below absorbs that.
+    monkeypatch.setattr(protocol, "MAX_REVISION_BYTES", size - 8)
+    with pytest.raises(SchemaError, match=r"New revision would be \d+ bytes; the limit is"):
+        revision(project, "initial")
+    assert versions(project) == []
+
+    monkeypatch.setattr(protocol, "MAX_REVISION_BYTES", size + 50)
+    revision(project, "initial")
+    assert pm_warnings(load_revisions, project)[1] == []
 
 
 def test_revision_rechecks_after_values(project, monkeypatch):
