@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import sqlite3
 import uuid
@@ -76,23 +77,6 @@ def init(project_dir: Path) -> Path:
     return root
 
 
-def _validate_prompt(name: str, value: Any) -> None:
-    if not re.fullmatch(r"[a-zA-Z][a-zA-Z0-9_-]{0,127}", name):
-        raise SchemaError(f"Invalid prompt name: {name!r}")
-    if not isinstance(value, dict):
-        raise SchemaError(f"Prompt {name!r} must contain a JSON object")
-    # Minimal structural validation; intentionally no framework-specific constraints.
-    if "messages" in value:
-        msgs = value["messages"]
-        if not isinstance(msgs, list) or any(
-            not isinstance(msg, dict)
-            or not isinstance(msg.get("role"), str)
-            or not isinstance(msg.get("content"), str)
-            for msg in msgs
-        ):
-            raise SchemaError(f"Prompt {name!r} has invalid messages")
-
-
 def read_drafts(project_dir: Path) -> dict[str, dict[str, Any]]:
     root = require_init(project_dir)
     drafts = {}
@@ -101,8 +85,14 @@ def read_drafts(project_dir: Path) -> dict[str, dict[str, Any]]:
             continue
         name = path.stem
         value, _raw, _rules = protocol.load_json(path, kind="draft", root=root)
-        _validate_prompt(name, value)
+        protocol.validate_config(name, value)
+        found = protocol.config_violations(name, value)
+        if found:
+            raise SchemaError(f"Invalid draft {path.name}: {', '.join(found)}")
         drafts[name] = value
+    collisions = protocol.case_collisions(drafts)
+    if collisions:
+        raise SchemaError(f"Invalid drafts: case-collision {collisions[0]}")
     return drafts
 
 
@@ -129,7 +119,7 @@ def load_revisions(project_dir: Path) -> list[Revision]:
                 raise SchemaError(f"Invalid change operation in {path.name}: {name}")
             for field in ("before", "after"):
                 if change[field] is not None:
-                    _validate_prompt(name, change[field])
+                    protocol.validate_config(name, change[field])
         if rid in unsorted:
             raise RevisionGraphError(f"Duplicate revision id: {rid}")
         unsorted[rid] = Revision(
@@ -208,6 +198,11 @@ def revision(project_dir: Path, message: str) -> Revision:
         raise SchemaError("No changes between drafts and migration head")
     rid = uuid.uuid4().hex[:12]
     parent = all_revisions[-1].revision if all_revisions else None
+    for name, change in changes.items():
+        if change["after"] is not None:
+            found = protocol.config_violations(name, change["after"])
+            if found:
+                raise SchemaError(f"New revision would be invalid: {', '.join(found)}")
     item = {
         "revision": rid,
         "down_revision": parent,
@@ -215,9 +210,14 @@ def revision(project_dir: Path, message: str) -> Revision:
         "created_at": datetime.now(timezone.utc).isoformat(),
         "changes": changes,
     }
+    text = pretty(item)
+    # write_text translates "\n" to os.linesep, so this is the exact size of the file it writes.
+    size = len(text.replace("\n", os.linesep).encode("utf-8"))
+    if size > protocol.MAX_REVISION_BYTES:
+        raise SchemaError(f"New revision would be {size} bytes; the limit is {protocol.MAX_REVISION_BYTES}")
     root = require_init(project_dir)
     path = root / "versions" / f"{rid}_{re.sub(r'[^a-z0-9]+', '_', message.lower()).strip('_')[:50] or 'revision'}.json"
-    path.write_text(pretty(item), encoding="utf-8")
+    path.write_text(text, encoding="utf-8")
     return load_revisions(project_dir)[-1]
 
 
