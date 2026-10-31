@@ -1,0 +1,30 @@
+{
+  "changes": {
+    "Assistant": {
+      "after": {
+        "messages": [
+          {
+            "content": "Upper",
+            "role": "system"
+          }
+        ]
+      },
+      "before": null
+    },
+    "assistant": {
+      "after": {
+        "messages": [
+          {
+            "content": "lower",
+            "role": "system"
+          }
+        ]
+      },
+      "before": null
+    }
+  },
+  "created_at": "2026-10-30T00:00:00+00:00",
+  "down_revision": null,
+  "message": "legacy: case-colliding names",
+  "revision": "aaaaaaaaaaaa"
+}
