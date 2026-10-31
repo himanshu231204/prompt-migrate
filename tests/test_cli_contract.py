@@ -1,10 +1,12 @@
 """PR 2: pin current CLI text output and exit codes (cli.main)."""
+import json
 import re
 
 import pytest
 
-from pmtest import set_draft
+from pmtest import pm_dir, set_draft
 from promptmigrate import cli
+from promptmigrate.core import pretty
 
 
 def run(capsys, project, *argv):
@@ -35,6 +37,10 @@ def test_environment_commands_text_output(project, capsys):
     rid = re.search(r"Created ([0-9a-f]{12})", out).group(1)
 
     assert run(capsys, project, "upgrade", "head", "--env", "dev") == (0, f"dev: applied 1 revision(s): {rid}\n", "")
+
+    draft = json.loads((pm_dir(project) / "drafts" / "assistant.json").read_text(encoding="utf-8"))
+    assert run(capsys, project, "get", "assistant", "--env", "dev") == (0, pretty(draft), "")
+
     assert run(capsys, project, "check", "--env", "dev", "--require-head") == (
         0, "OK: dev is consistent (1/1 revisions applied)\n", "")
     assert run(capsys, project, "current", "--env", "dev") == (0, f"dev: {rid} (1/1 applied)\n", "")
@@ -44,6 +50,7 @@ def test_environment_commands_text_output(project, capsys):
 
 
 def test_domain_error_goes_to_stderr_with_exit_1(project, capsys):
+    """Exit code 1 is the pre-PR-6 contract; PR 6 deliberately changes it."""
     run(capsys, project, "revision", "-m", "initial")
     run(capsys, project, "upgrade", "--env", "dev")
     assert run(capsys, project, "get", "nope", "--env", "dev") == (
@@ -51,6 +58,7 @@ def test_domain_error_goes_to_stderr_with_exit_1(project, capsys):
 
 
 def test_invalid_env_name_exit_1(project, capsys):
+    """Exit code 1 is the pre-PR-6 contract; PR 6 deliberately changes it."""
     assert run(capsys, project, "check", "--env", "../escape") == (
         1, "", "Error: Environment must be alphanumeric, starting with a letter\n")
 
