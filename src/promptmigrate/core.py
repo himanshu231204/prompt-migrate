@@ -23,6 +23,7 @@ from .errors import (
     DriftError, InitializationError, IntegrityError, MigrationConflictError, MigrationError, PendingRevisionsError,
     RevisionGraphError, SchemaError, TargetError,
 )
+from . import protocol
 
 
 @dataclass(frozen=True)
@@ -102,10 +103,7 @@ def read_drafts(project_dir: Path) -> dict[str, dict[str, Any]]:
         if path.is_dir() or path.suffix != ".json":
             continue
         name = path.stem
-        try:
-            value = json.loads(path.read_text(encoding="utf-8"))
-        except (ValueError, OSError) as exc:
-            raise SchemaError(f"Invalid JSON draft {path.name}: {exc}") from exc
+        value, _raw, _rules = protocol.load_json(path, kind="draft", root=root)
         _validate_prompt(name, value)
         drafts[name] = value
     return drafts
@@ -115,11 +113,7 @@ def load_revisions(project_dir: Path) -> list[Revision]:
     root = require_init(project_dir)
     unsorted: dict[str, Revision] = {}
     for path in sorted((root / "versions").glob("*.json")):
-        raw = path.read_bytes()
-        try:
-            item = json.loads(raw)
-        except (ValueError, OSError) as exc:
-            raise SchemaError(f"Unreadable migration {path.name}: {exc}") from exc
+        item, raw, _file_rules = protocol.load_json(path, kind="revision", root=root)
         if not isinstance(item, dict) or not all(
             k in item for k in ("revision", "down_revision", "message", "created_at", "changes")
         ):
