@@ -164,6 +164,19 @@ def test_store_canonical_resolution_and_undeclared_no_adoption(project):
     assert exc.value.env == "prdo" and snapshot(project) == before
 
 
+def test_store_rejected_mutations_create_no_files(project):
+    api = store_api()
+    manifest(project, {"dev": {}})
+    before = snapshot(project)
+    with pytest.raises(errors.EnvironmentNotDeclaredError):
+        api.resolve_environment(project, "prdo", mutating=True)
+    assert snapshot(project) == before
+    with pytest.raises(errors.SchemaError):
+        api.add_environment(project, "DEV")
+    assert snapshot(project) == before
+    assert not (pm_dir(project) / "states" / ".environments.lock").exists()
+
+
 @pytest.mark.parametrize("name", ["a", "Qa_2-local", "a" * 64])
 def test_store_add_valid_name(project, name):
     api = store_api()
@@ -397,6 +410,21 @@ def test_store_readonly_rejects_dangling_database_symlink(project):
             pytest.fail("dangling state link must not be reported as base state")
 
 
+def test_store_rejects_symlinked_states_directory(project, tmp_path):
+    api = store_api()
+    outside = tmp_path / "outside-states"
+    outside.mkdir()
+    with closing(sqlite3.connect(outside / "dev.sqlite3")) as db:
+        db.execute("CREATE TABLE prompts (name TEXT PRIMARY KEY, config TEXT NOT NULL)")
+        db.execute("CREATE TABLE applied_revisions (seq INTEGER PRIMARY KEY, revision TEXT, checksum TEXT, applied_at TEXT)")
+    states = pm_dir(project) / "states"
+    states.rmdir()
+    symlink_or_skip(states, outside)
+    with pytest.raises(errors.StorageError):
+        with api.connect_readonly(project, "dev"):
+            pytest.fail("state directory link must not redirect outside the project")
+
+
 def test_store_write_rejects_incomplete_existing_db_without_repair(project):
     api = store_api()
     path = pm_dir(project) / "states" / "dev.sqlite3"
@@ -454,3 +482,36 @@ def test_store_write_setup_failure_closes(project, monkeypatch):
             pytest.fail("setup failure must not yield")
     with pytest.raises(sqlite3.ProgrammingError, match="closed"):
         opened[0].execute("SELECT 1")
+
+
+def test_store_concurrent_first_writes_initialize_schema_once(project, monkeypatch):
+    api = store_api()
+    path = pm_dir(project) / "states" / "dev.sqlite3"
+    real_connect = sqlite3.connect
+    barrier = threading.Barrier(2)
+
+    def connect(database, *args, **kwargs):
+        if Path(database) == path:
+            barrier.wait(timeout=2)
+        return real_connect(database, *args, **kwargs)
+
+    monkeypatch.setattr(sqlite3, "connect", connect)
+    failures = []
+
+    def open_write():
+        try:
+            with api.connect_write(project, "dev"):
+                pass
+        except BaseException as exc:
+            failures.append(exc)
+
+    threads = [threading.Thread(target=open_write) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(4)
+    assert not any(thread.is_alive() for thread in threads)
+    assert failures == []
+    with closing(real_connect(path)) as db:
+        tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    assert {"applied_revisions", "prompts"} <= tables

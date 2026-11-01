@@ -10,11 +10,10 @@ from test_environments import error_type, manifest, run_cli, store_api
 
 
 def snapshot(project):
-    lock_path = ".promptmigrate/states/.environments.lock"
-    return ({key: value for key, value in tree_snapshot(project).items() if key != lock_path}, {
+    return tree_snapshot(project), {
         p.relative_to(project).as_posix(): p.stat().st_mtime_ns
-        for p in project.rglob("*") if p.is_file() and p.relative_to(project).as_posix() != lock_path
-    })
+        for p in project.rglob("*") if p.is_file()
+    }
 
 
 @pytest.mark.parametrize("command", ["check", "current", "get"])

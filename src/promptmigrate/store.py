@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -37,6 +38,24 @@ def _root(project_dir: Path) -> Path:
     return root
 
 
+def _is_linklike(path: Path) -> bool:
+    if path.is_symlink():
+        return True
+    if os.name == "nt":
+        try:
+            return bool(path.stat(follow_symlinks=False).st_file_attributes & 0x400)
+        except FileNotFoundError:
+            return False
+    return False
+
+
+def _states_dir(project_dir: Path) -> Path:
+    path = _root(project_dir) / "states"
+    if _is_linklike(path):
+        raise StorageError("Invalid environment state: states directory is a symbolic link or junction")
+    return path
+
+
 def read_environments(project_dir: Path) -> tuple[dict[str, dict[str, Any]], bool]:
     """Read declarations, or infer legacy declarations without writing any files."""
     root = _root(project_dir)
@@ -48,7 +67,7 @@ def read_environments(project_dir: Path) -> tuple[dict[str, dict[str, Any]], boo
         environments = value["environments"]
         existed = True
     else:
-        states = sorted((p for p in (root / "states").glob("*.sqlite3") if p.is_file()), key=lambda p: p.stem.lower())
+        states = sorted((p for p in _states_dir(project_dir).glob("*.sqlite3") if p.is_file()), key=lambda p: p.stem.lower())
         environments = {p.stem: {} for p in states} if states else {"dev": {}, "staging": {}}
         existed = False
     for name, metadata in environments.items():
@@ -84,27 +103,40 @@ def _write_environments(project_dir: Path, environments: dict[str, dict[str, Any
 @contextmanager
 def _manifest_lock(project_dir: Path) -> Iterator[None]:
     """Serialize manifest read-modify-write operations across threads and processes."""
-    path = _root(project_dir) / "states" / ".environments.lock"
-    path.parent.mkdir(exist_ok=True)
-    with path.open("a+b") as lock:
-        lock.seek(0, os.SEEK_END)
-        if lock.tell() == 0:
-            lock.write(b"\0")
-            lock.flush()
-        lock.seek(0)
-        if os.name == "nt":
-            import msvcrt
-            msvcrt.locking(lock.fileno(), msvcrt.LK_LOCK, 1)
-        else:
-            import fcntl
-            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+    root = _root(project_dir)
+    if os.name == "nt":
+        import ctypes
+        digest = hashlib.sha256(os.fsencode(root)).hexdigest()
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.CreateMutexW.argtypes = (ctypes.c_void_p, ctypes.c_int, ctypes.c_wchar_p)
+        kernel.CreateMutexW.restype = ctypes.c_void_p
+        kernel.WaitForSingleObject.argtypes = (ctypes.c_void_p, ctypes.c_uint32)
+        kernel.WaitForSingleObject.restype = ctypes.c_uint32
+        kernel.ReleaseMutex.argtypes = (ctypes.c_void_p,)
+        kernel.CloseHandle.argtypes = (ctypes.c_void_p,)
+        handle = kernel.CreateMutexW(None, False, f"Local\\PromptMigrate-{digest}")
+        if not handle:
+            raise OSError(ctypes.get_last_error(), "Could not create environment manifest mutex")
+        result = kernel.WaitForSingleObject(handle, 0xFFFFFFFF)
+        if result not in (0, 0x80):
+            kernel.CloseHandle(handle)
+            raise OSError(ctypes.get_last_error(), "Could not acquire environment manifest mutex")
         try:
             yield
         finally:
-            if os.name == "nt":
-                msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
-            else:
-                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+            kernel.ReleaseMutex(handle)
+            kernel.CloseHandle(handle)
+    else:
+        import fcntl
+        descriptor = os.open(root, os.O_RDONLY)
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(descriptor, fcntl.LOCK_UN)
+        finally:
+            os.close(descriptor)
 
 
 def _warn_adoption() -> None:
@@ -156,14 +188,14 @@ def add_environment(project_dir: Path, name: str) -> Path:
 def list_environments(project_dir: Path) -> list[tuple[str, bool]]:
     """List canonical declarations and state-file presence without opening SQLite."""
     environments, _existed = read_environments(project_dir)
-    states = _root(project_dir) / "states"
+    states = _states_dir(project_dir)
     return [(name, (states / f"{name}.sqlite3").is_file()) for name in sorted(environments, key=str.lower)]
 
 
 def _db_path(project_dir: Path, env: str) -> Path:
     _validate_name(env)
-    path = _root(project_dir) / "states" / f"{env}.sqlite3"
-    if path.is_symlink():
+    path = _states_dir(project_dir) / f"{env}.sqlite3"
+    if _is_linklike(path):
         raise StorageError(f"Invalid environment state {env!r}: database path is a symbolic link")
     return path
 
@@ -173,7 +205,7 @@ def connect_readonly(project_dir: Path, env: str) -> Iterator[sqlite3.Connection
     """Yield base state for an absent DB, otherwise a checked, read-only connection."""
     path = _db_path(project_dir, env)
     if not path.exists():
-        if path.is_symlink():
+        if _is_linklike(path):
             raise StorageError(f"Invalid environment state {env!r}: database path is a dangling symbolic link")
         yield None
         return
@@ -209,7 +241,7 @@ def connect_write(project_dir: Path, env: str) -> Iterator[sqlite3.Connection]:
                 raise StorageError(f"Invalid environment state {env!r}: missing required tables")
         else:
             connection.execute("""
-                CREATE TABLE applied_revisions (
+                CREATE TABLE IF NOT EXISTS applied_revisions (
                     seq INTEGER PRIMARY KEY AUTOINCREMENT,
                     revision TEXT UNIQUE NOT NULL,
                     checksum TEXT NOT NULL,
@@ -217,7 +249,7 @@ def connect_write(project_dir: Path, env: str) -> Iterator[sqlite3.Connection]:
                 )
             """)
             connection.execute("""
-                CREATE TABLE prompts (
+                CREATE TABLE IF NOT EXISTS prompts (
                     name TEXT PRIMARY KEY,
                     config TEXT NOT NULL
                 )
