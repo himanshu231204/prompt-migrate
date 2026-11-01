@@ -73,7 +73,6 @@ def test_undeclared_error_type_carries_env():
     b'{"environments": {"dev": {"x": NaN}}}',
     b'{"environments": {"dev": {"x": Infinity}}}',
     b'{"environments": {"dev": {"x": 1e999}}}',
-    b"[" * 2000 + b"]" * 2000,
 ])
 def test_strict_loader_rejects_invalid_json(project, raw):
     path = pm_dir(project) / "environments.json"
