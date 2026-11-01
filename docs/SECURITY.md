@@ -52,20 +52,25 @@ These are **not** sufficient as an end-to-end production security architecture.
 
 ## Secret safeguard (heuristic)
 
-Rules apply to every string value, including prompt `content`: OpenAI/Anthropic-style `sk-…` keys, AWS access key
-ids, GitHub tokens, Slack tokens, PEM private-key headers, bearer tokens and JWTs. A further rule flags the value of
-keys named like `api_key`, `password`, `secret`, `client_secret`, `access_token`, `auth_token`, `token` or
-`private_key`, unless it is empty or a `secret://` reference.
+Rules apply to every string value, including prompt `content`: `openai-anthropic-key` (`sk-…`), `aws-access-key-id`,
+`github-token`, `slack-token`, `private-key-pem`, `bearer-token` and `jwt`. A further rule, `secret-key-name`, flags
+the value of keys named like `api_key`, `password`, `secret`, `client_secret`, `access_token`, `auth_token`, `token`
+or `private_key`, unless it is empty or a `secret://` reference.
+
+Revision commit messages are scanned too, as name `(message)`, path `/message`; allowlist a message finding with
+`"name": "(message)", "path": "/message"`.
 
 | Command | On a finding that is not allowlisted |
 |---|---|
 | `revision` | refuses, writes no file; a value copied into `before` from history only warns |
 | `diff`, `get` | shows `<redacted:RULE>` instead of the string |
-| `check` | warns about history findings and stale allowlist entries; exit code unchanged |
+| `history` | shows `<redacted:RULE>` for a flagged message |
+| `check` | warns about history findings (including messages) and stale allowlist entries; exit code unchanged |
 
 **Limits.** Detection is pattern-based, so it misses secrets that don't look like a known token, and can flag text that
 only looks like one. It does nothing for secrets already committed: those stay in Git history and must be rotated.
-Messages, warnings and errors carry names, JSON paths and rule ids, never the values.
+Object keys and config names are not scanned. Messages, warnings and errors carry names, JSON paths and rule ids,
+never the values.
 
 **Allowlist.** `.promptmigrate/secret-allowlist.json` is Git-tracked, so changes to it get code review:
 

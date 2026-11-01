@@ -11,7 +11,7 @@ Familiar to Alembic users, transparent in CI, safe by default. Commands distingu
 | `promptmigrate init` | Scaffold project | Creates `.promptmigrate/` and starter `assistant.json` |
 | `promptmigrate revision -m "message"` | Generate revision from draft delta | Rejects no-op; parent = source head; refuses drafts that break validation or limits, and secret-like values in new content, before writing |
 | `promptmigrate diff` | Compare drafts with source migration head | JSON diff to stdout; not env diff; secret-like values shown as <redacted:RULE> |
-| `promptmigrate history` | Print ordered source revisions | Shows ID, parent, message |
+| `promptmigrate history` | Print ordered source revisions | Shows ID, parent, message; secret-like messages shown as <redacted:RULE> |
 | `promptmigrate current --env dev` | Show env applied head | Verifies local state first |
 | `promptmigrate upgrade head --env dev` | Advance to source head | SQLite transactional operation |
 | `promptmigrate upgrade <revision> --env dev` | Advance to exact revision | Must be ahead of/equal to current |
@@ -66,8 +66,8 @@ all subclasses of `MigrationError`); the detailed exit-code mapping arrives with
 
 **Warnings:** each distinct warning is printed once per invocation to stderr as `Warning: <message>`, before any
 `Error: …` line. Warnings never change the exit code. Warnings come from existing revision files that break a tier-B
-rule (see MIGRATION_PROTOCOL.md, "Strict parsing and compatibility tiers") and from the secret safeguard (redaction,
-secrets in history, stale allowlist entries; see SECURITY.md).
+rule (see `MIGRATION_PROTOCOL.md`, "Strict parsing and compatibility tiers") and from the secret safeguard (redaction,
+secrets in history, stale allowlist entries; see `SECURITY.md`).
 
 **Proposed taxonomy:** `0` success, `2` usage, `3` invalid source/schema, `4` drift/integrity conflict, `5` lock/storage problem, `6` evaluation gate failure, `7` provider error. Introduce only after contract tests and documentation update.
 
