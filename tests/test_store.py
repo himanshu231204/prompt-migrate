@@ -484,18 +484,10 @@ def test_store_write_setup_failure_closes(project, monkeypatch):
         opened[0].execute("SELECT 1")
 
 
-def test_store_concurrent_first_writes_initialize_schema_once(project, monkeypatch):
+def test_store_concurrent_first_writes_initialize_schema_once(project):
     api = store_api()
     path = pm_dir(project) / "states" / "dev.sqlite3"
     real_connect = sqlite3.connect
-    barrier = threading.Barrier(2)
-
-    def connect(database, *args, **kwargs):
-        if Path(database) == path:
-            barrier.wait(timeout=2)
-        return real_connect(database, *args, **kwargs)
-
-    monkeypatch.setattr(sqlite3, "connect", connect)
     failures = []
 
     def open_write():
@@ -515,3 +507,48 @@ def test_store_concurrent_first_writes_initialize_schema_once(project, monkeypat
     with closing(real_connect(path)) as db:
         tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert {"applied_revisions", "prompts"} <= tables
+
+
+def test_store_second_writer_waits_for_first_schema_initialization(project, monkeypatch):
+    api = store_api()
+    path = pm_dir(project) / "states" / "dev.sqlite3"
+    real_connect = sqlite3.connect
+    created = threading.Event()
+    release_setup = threading.Event()
+    first_connection = True
+
+    class PausedConnection(sqlite3.Connection):
+        def execute(self, sql, *args):
+            if sql == "PRAGMA busy_timeout=10000" and threading.current_thread().name == "first-writer":
+                created.set()
+                assert release_setup.wait(3)
+            return super().execute(sql, *args)
+
+    def connect(database, *args, **kwargs):
+        nonlocal first_connection
+        if Path(database) == path and first_connection:
+            first_connection = False
+            kwargs["factory"] = PausedConnection
+        return real_connect(database, *args, **kwargs)
+
+    monkeypatch.setattr(sqlite3, "connect", connect)
+    failures = []
+
+    def open_write():
+        try:
+            with api.connect_write(project, "dev"):
+                pass
+        except BaseException as exc:
+            failures.append(exc)
+
+    first = threading.Thread(target=open_write, name="first-writer")
+    second = threading.Thread(target=open_write, name="second-writer")
+    first.start()
+    assert created.wait(2)
+    second.start()
+    time.sleep(0.05)
+    release_setup.set()
+    first.join(4)
+    second.join(4)
+    assert not first.is_alive() and not second.is_alive()
+    assert failures == []

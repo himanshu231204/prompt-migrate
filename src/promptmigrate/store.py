@@ -101,8 +101,8 @@ def _write_environments(project_dir: Path, environments: dict[str, dict[str, Any
 
 
 @contextmanager
-def _manifest_lock(project_dir: Path) -> Iterator[None]:
-    """Serialize manifest read-modify-write operations across threads and processes."""
+def _project_lock(project_dir: Path) -> Iterator[None]:
+    """Serialize project metadata changes and initial environment database setup."""
     root = _root(project_dir)
     if os.name == "nt":
         import ctypes
@@ -114,7 +114,7 @@ def _manifest_lock(project_dir: Path) -> Iterator[None]:
         kernel.WaitForSingleObject.restype = ctypes.c_uint32
         kernel.ReleaseMutex.argtypes = (ctypes.c_void_p,)
         kernel.CloseHandle.argtypes = (ctypes.c_void_p,)
-        handle = kernel.CreateMutexW(None, False, f"Local\\PromptMigrate-{digest}")
+        handle = kernel.CreateMutexW(None, False, f"Global\\PromptMigrate-{digest}")
         if not handle:
             raise OSError(ctypes.get_last_error(), "Could not create environment manifest mutex")
         result = kernel.WaitForSingleObject(handle, 0xFFFFFFFF)
@@ -153,7 +153,7 @@ def resolve_environment(project_dir: Path, env: str, *, mutating: bool = False) 
     """Resolve case-insensitively, persisting legacy declarations only on mutation."""
     _validate_name(env)
     if mutating:
-        with _manifest_lock(project_dir):
+        with _project_lock(project_dir):
             environments, existed = read_environments(project_dir)
             name = next((name for name in environments if name.lower() == env.lower()), None)
             if name is None:
@@ -173,7 +173,7 @@ def resolve_environment(project_dir: Path, env: str, *, mutating: bool = False) 
 def add_environment(project_dir: Path, name: str) -> Path:
     """Atomically declare a new name, retaining all existing metadata."""
     _validate_name(name)
-    with _manifest_lock(project_dir):
+    with _project_lock(project_dir):
         environments, existed = read_environments(project_dir)
         if any(existing.lower() == name.lower() for existing in environments):
             raise SchemaError(f"Environment {name!r} is already declared")
@@ -227,34 +227,41 @@ def connect_readonly(project_dir: Path, env: str) -> Iterator[sqlite3.Connection
 @contextmanager
 def connect_write(project_dir: Path, env: str) -> Iterator[sqlite3.Connection]:
     """Initialize writable storage, commit on success, roll back on error, always close."""
-    path = _db_path(project_dir, env)
-    path.parent.mkdir(exist_ok=True)
-    existed = path.exists()
-    connection = sqlite3.connect(path, timeout=10)
+    connection = None
+    with _project_lock(project_dir):
+        path = _db_path(project_dir, env)
+        path.parent.mkdir(exist_ok=True)
+        existed = path.exists()
+        connection = sqlite3.connect(path, timeout=10)
+        try:
+            connection.execute("PRAGMA busy_timeout=10000")
+            connection.execute("PRAGMA synchronous=FULL")
+            connection.execute("PRAGMA foreign_keys=ON")
+            if existed:
+                tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+                if not {"applied_revisions", "prompts"} <= tables:
+                    raise StorageError(f"Invalid environment state {env!r}: missing required tables")
+            else:
+                connection.execute("""
+                    CREATE TABLE IF NOT EXISTS applied_revisions (
+                        seq INTEGER PRIMARY KEY AUTOINCREMENT,
+                        revision TEXT UNIQUE NOT NULL,
+                        checksum TEXT NOT NULL,
+                        applied_at TEXT NOT NULL
+                    )
+                """)
+                connection.execute("""
+                    CREATE TABLE IF NOT EXISTS prompts (
+                        name TEXT PRIMARY KEY,
+                        config TEXT NOT NULL
+                    )
+                """)
+            connection.commit()
+        except BaseException:
+            connection.rollback()
+            connection.close()
+            raise
     try:
-        connection.execute("PRAGMA busy_timeout=10000")
-        connection.execute("PRAGMA synchronous=FULL")
-        connection.execute("PRAGMA foreign_keys=ON")
-        if existed:
-            tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-            if not {"applied_revisions", "prompts"} <= tables:
-                raise StorageError(f"Invalid environment state {env!r}: missing required tables")
-        else:
-            connection.execute("""
-                CREATE TABLE IF NOT EXISTS applied_revisions (
-                    seq INTEGER PRIMARY KEY AUTOINCREMENT,
-                    revision TEXT UNIQUE NOT NULL,
-                    checksum TEXT NOT NULL,
-                    applied_at TEXT NOT NULL
-                )
-            """)
-            connection.execute("""
-                CREATE TABLE IF NOT EXISTS prompts (
-                    name TEXT PRIMARY KEY,
-                    config TEXT NOT NULL
-                )
-            """)
-        connection.commit()
         yield connection
         connection.commit()
     except BaseException:
