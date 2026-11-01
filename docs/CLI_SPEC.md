@@ -26,9 +26,9 @@ Familiar to Alembic users, transparent in CI, safe by default. Commands distingu
 
 The environment manifest has the form `{"environments": {"dev": {}, "staging": {}}}`. Each value is an opaque JSON metadata object retained by `env add`; names are case-insensitive for identity and use the spelling stored in the manifest for filenames and output. Names match `[A-Za-z][A-Za-z0-9_-]{0,63}` and Windows device names are rejected for portability.
 
-Existing projects without a manifest are read in memory from `states/*.sqlite3` names, or default to `dev` and `staging` when no state files exist. Read-only commands never persist this adoption. The first successful mutation writes the inferred manifest and emits one adoption warning. An undeclared environment fails before database access or file creation.
+Existing projects without a manifest are read in memory from `states/*.sqlite3` names, or default to `dev` and `staging` when no state files exist. Read-only commands never persist this adoption. The first attempted mutation for a declared inferred environment writes the manifest and emits one adoption warning before target/history/state validation; a later error does not undo adoption. An undeclared environment fails before database access or file creation.
 
-`check`, `current`, `get`, and `env list` are read-only. They do not create missing state databases. An absent database represents the empty base state; an existing database missing either required table is a storage error and is never repaired by a read. `upgrade` and `downgrade` use local SQLite transactions. Production-like names (`prod`, `production`, `live`) emit a warning: these names still refer only to local SQLite files.
+`check`, `current`, `get`, and `env list` are read-only. They do not create missing state databases. An absent database represents the empty base state; an existing database missing either required table or using WAL journal mode is a storage error and is never repaired by a read. CLI status labels use canonical manifest spelling. `upgrade` and `downgrade` use local SQLite transactions. Production-like names (`prod`, `production`, `live`) emit a warning: these names still refer only to local SQLite files.
 
 **Global flag:** `promptmigrate --project /path/to/project <command>`.
 

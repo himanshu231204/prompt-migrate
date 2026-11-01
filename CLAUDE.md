@@ -13,7 +13,7 @@ Workflow, TDD rules, hard rules and the review report format are in [`AGENTS.md`
 - Implemented: `init`, `revision`, `history`, `diff`, `current`, `upgrade`, `downgrade`, `check`, `get`, `env add`, `env list`.
 - Current scope: Phase 1, cycle 1, in `docs/ROADMAP.md`.
 - `docs/` also describes future modules and commands (`plan`, `eval`, `export`, Postgres, SDK, …). They don't exist yet.
-- Test baseline: after PR 4, Windows 11 / Python 3.11.9 reports `461 passed, 16 skipped, 33 warnings`; the original seven unittest tests pass. Skips include symlink and case-collision cases unavailable on this host. Linux/macOS are claimed only after a remote CI run.
+- Test baseline: after PR 4, Windows 11 / Python 3.11.9 reports `465 passed, 16 skipped, 33 warnings`; the original seven unittest tests pass. Skips include symlink and case-collision cases unavailable on this host. Linux/macOS are claimed only after a remote CI run.
 
 ## Commands
 
@@ -39,7 +39,7 @@ Logic is in `src/promptmigrate/core.py` (public facade, revision parsing, graph,
 **Four states, kept distinct:**
 1. **Drafts:** `.promptmigrate/drafts/<name>.json`, the desired config (one JSON object per name).
 2. **Source history:** `.promptmigrate/versions/<12hex>_<slug>.json`. Each revision has `revision`, `down_revision`, `message`, `created_at`, and `changes: {name: {before, after}}`. These are full snapshots, and `null` means the config is absent.
-3. **Environment declarations:** `.promptmigrate/environments.json` (Git tracked), with canonical names and metadata. Legacy projects are inferred for reads and adopted on first successful mutation.
+3. **Environment declarations:** `.promptmigrate/environments.json` (Git tracked), with canonical names and metadata. Legacy projects are inferred for reads and adopted before the first attempted mutation that resolves a declared inferred environment; later migration validation can still fail.
 4. **Applied env state:** `.promptmigrate/states/<env>.sqlite3` (gitignored), with tables `applied_revisions(seq, revision, checksum, applied_at)` and `prompts(name, config)`. `check`, `current`, and `get` use read-only SQLite; missing state is base, incomplete state is an error.
 5. **Runtime state:** not implemented. Nothing connects SQLite state to an application, and `--env prod` is only a local file with an explicit warning.
 
