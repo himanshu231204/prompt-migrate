@@ -214,6 +214,10 @@ def test_redact_without_findings_returns_the_input():
     assert secretscan.redact("a", config) == (config, [])
 
 
+def test_redact_handles_a_flagged_bare_string_root():
+    assert secretscan.redact("a", fake_key()) == ("<redacted:openai-anthropic-key>", [""])
+
+
 # --- allowlist parsing ------------------------------------------------------------------------
 
 def item(**overrides):
@@ -245,6 +249,7 @@ BAD = {
                         "entry 0: fingerprint must be 'sha256:' followed by 64 lowercase hex digits"),
     "empty reason": ({"allow": [item(reason=" ")]}, "entry 0: reason must not be empty"),
     "second entry": ({"allow": [item(), item(rule="nope")]}, "entry 1: unknown rule 'nope'"),
+    "duplicate entry": ({"allow": [item(), item(reason="other")]}, "entry 1: duplicates entry 0"),
 }
 
 
@@ -258,7 +263,8 @@ def test_parse_allowlist_rejects(case):
 def test_allowlist_errors_never_print_fingerprints():
     fingerprint = "sha256:" + "ab" * 32
     for bad in (item(fingerprint=fingerprint, rule="nope"), item(fingerprint=fingerprint, reason=""),
-                item(fingerprint=fingerprint, extra="1")):
+                item(fingerprint=fingerprint, extra="1"), item(rule=fingerprint),
+                {**item(), fingerprint: "x"}):
         with pytest.raises(SchemaError) as info:
             secretscan.parse_allowlist({"allow": [bad]}, "f.json")
         assert "ab" * 32 not in str(info.value)

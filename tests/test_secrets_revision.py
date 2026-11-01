@@ -1,5 +1,6 @@
 """PR 3b: revision() refuses new secret-like content (I13); the allowlist file; secrets copied from history."""
 import re
+import warnings
 
 import pytest
 
@@ -96,6 +97,16 @@ def test_copied_history_secret_warning_category(project):
     set_draft(project, "assistant", CFG)
     with pytest.warns(SecretInHistoryWarning, match="the credential must be rotated"):
         revision(project, "remove leaked key")
+
+
+def test_refused_revision_warns_about_nothing(project):
+    GENERATED["secret_in_history"](project)
+    set_draft(project, "assistant", {**CFG, "note": fake_key("7")})
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        with pytest.raises(SecretDetectedError):
+            revision(project, "swap leaked key")
+    assert not any(issubclass(w.category, SecretInHistoryWarning) for w in caught)
 
 
 # --- the allowlist file -----------------------------------------------------------------------

@@ -144,11 +144,19 @@ def redact(name: str, config: Any, allow: Iterable[AllowEntry] = ()) -> tuple[An
         if finding.path in paths:
             continue
         paths.append(finding.path)
+        if not parts:
+            copy = f"<redacted:{finding.rule}>"
+            continue
         target = copy
         for part in parts[:-1]:
             target = target[part]
         target[parts[-1]] = f"<redacted:{finding.rule}>"
     return copy, paths
+
+
+def _showable(text: Any) -> str:
+    """`repr(text)` when it is safe to echo in an error, else a placeholder. Never echoes a fingerprint or value."""
+    return repr(text) if isinstance(text, str) and _SHOWABLE.fullmatch(text) else "(not shown)"
 
 
 def parse_allowlist(value: Any, filename: str) -> list[AllowEntry]:
@@ -157,23 +165,28 @@ def parse_allowlist(value: Any, filename: str) -> list[AllowEntry]:
     if not isinstance(value, dict) or set(value) != {"allow"} or not isinstance(value["allow"], list):
         raise SchemaError(f'{prefix}: the top level must be {{"allow": [...]}}')
     entries = []
+    seen: dict[tuple[str, str, str, str], int] = {}
     for index, item in enumerate(value["allow"]):
         where = f"{prefix}: entry {index}"
         if not isinstance(item, dict):
             raise SchemaError(f"{where} must be an object")
         unknown = sorted(set(item) - set(_FIELDS))
         if unknown:
-            raise SchemaError(f"{where}: unknown key {unknown[0]!r}")
+            raise SchemaError(f"{where}: unknown key {_showable(unknown[0])}")
         missing = [field for field in _FIELDS if field not in item]
         if missing:
             raise SchemaError(f"{where}: missing {missing[0]}")
         if not all(isinstance(item[field], str) for field in _FIELDS):
             raise SchemaError(f"{where}: every field must be a string")
         if item["rule"] not in RULE_IDS:
-            raise SchemaError(f"{where}: unknown rule {item['rule']!r}")
+            raise SchemaError(f"{where}: unknown rule {_showable(item['rule'])}")
         if not _FINGERPRINT.fullmatch(item["fingerprint"]):
             raise SchemaError(f"{where}: fingerprint must be 'sha256:' followed by 64 lowercase hex digits")
         if not item["reason"].strip():
             raise SchemaError(f"{where}: reason must not be empty")
+        key = (item["name"], item["path"], item["rule"], item["fingerprint"])
+        if key in seen:
+            raise SchemaError(f"{where}: duplicates entry {seen[key]}")
+        seen[key] = index
         entries.append(AllowEntry(*(item[field] for field in _FIELDS)))
     return entries
