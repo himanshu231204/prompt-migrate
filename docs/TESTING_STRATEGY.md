@@ -20,7 +20,7 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 | 2026-10-30 (after PR 2) | Windows 11, Python 3.11.9 | `python -m pytest -q` → `45 passed, 1 skipped, 5 xfailed` |
 | 2026-10-31 (after PR 3) | Windows 11, Python 3.11.9 | `python -m pytest -q` → `147 passed, 7 skipped, 2 xfailed` |
 | 2026-11-01 (after PR 3b) | Windows 11, Python 3.11.9 | `python -m pytest -q` → `262 passed, 8 skipped, 2 xfailed` |
-| 2026-11-01 (after PR 4) | Windows 11, Python 3.11.9 | `.venv/Scripts/python -m pytest -q -rxXs` → `465 passed, 16 skipped, 33 warnings`; original unittest suite → `Ran 7 tests ... OK` |
+| 2026-11-01 (after PR 4) | Windows 11, Python 3.11.9 | `.venv/Scripts/python -m pytest -q -rxXs` → `469 passed, 16 skipped, 33 warnings`; original unittest suite → `Ran 7 tests ... OK` |
 
 CI runs Ubuntu, Windows and macOS × Python 3.10, 3.12 and 3.13. Python 3.11 is not in the CI matrix; it is covered only
 by the local Windows merge gate (`AGENTS.md`). CI results count only once the repository has a remote.
