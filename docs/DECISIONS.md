@@ -84,3 +84,10 @@ Each ADR documents a decision and its rationale. **Confirmed** means the convers
 **Decision:** tier A (ambiguous or unsafe input) fails closed everywhere. Tier B (hygiene and limits) is enforced on drafts and newly generated revisions, and only warned about (`LegacyRevisionWarning`) in existing revision files.  
 **Why:** existing histories can legitimately break rules the starter never had. Rejecting them would block every command, including the `downgrade` needed to recover.  
 **Consequence:** `before` values are never validated as new content. Per-config rules are reported once, at the revision whose `after` introduced the violation. Non-finite numbers, including literals that overflow to infinity, are tier A in revision files too. The starter wrote `Infinity` for an overflowing draft number, so such a history now fails closed and must be corrected by hand.
+
+## ADR-021 — Heuristic secret safeguard with a fingerprinted allowlist
+
+**Status:** implemented (Phase 1 cycle 1, PR 3b).  
+**Decision:** pattern-based detection blocks secret-like values in new revision content, redacts them in `diff`/`get` output, and warns about them in history. False positives go in a Git-tracked allowlist whose entries bind name, JSON path, rule and the SHA-256 fingerprint of the exact value.  
+**Why:** Git keeps every committed revision forever, so the cheapest place to stop a leaked credential is before the file is written. Binding an entry to a fingerprint means a real credential that replaces a documented example is caught again.  
+**Consequence:** detection is heuristic and can miss secrets; it does nothing for secrets already in history, which must be rotated. A value copied from history into `before` never blocks, so a leak can always be removed.

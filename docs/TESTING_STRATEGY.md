@@ -19,11 +19,12 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 | 2026-10-30 (after PR 1) | Windows 11, Python 3.11.9 | `python -m pytest -q` → `17 passed`; unittest → original 7 `OK` |
 | 2026-10-30 (after PR 2) | Windows 11, Python 3.11.9 | `python -m pytest -q` → `45 passed, 1 skipped, 5 xfailed` |
 | 2026-10-31 (after PR 3) | Windows 11, Python 3.11.9 | `python -m pytest -q` → `147 passed, 7 skipped, 2 xfailed` |
+| 2026-11-01 (after PR 3b) | Windows 11, Python 3.11.9 | `python -m pytest -q` → `262 passed, 8 skipped, 2 xfailed` |
 
 CI runs Ubuntu, Windows and macOS × Python 3.10, 3.12 and 3.13. Python 3.11 is not in the CI matrix; it is covered only
 by the local Windows merge gate (`AGENTS.md`). CI results count only once the repository has a remote.
 
-Tests currently cover: initial revision and two environments; downgrade; checksum tampering; local drift; bad before-state preconditions; deletion/recovery; invalid environment name; no-op revision; multi-prompt revision/rollback. Phase 1 cycle 1 PR 2 added characterization tests (revision-graph errors, upgrade/downgrade targets, CLI text output and exit codes, the README example), five strict xfails for known bugs, and eight legacy-history compatibility fixtures. PR 3 added error-type, strict-parsing, canonical-equality, new-content, legacy-warning and CLI-warning tests, and removed three of the five xfails. This is **proof of a local prototype**, not extensive production verification.
+Tests currently cover: initial revision and two environments; downgrade; checksum tampering; local drift; bad before-state preconditions; deletion/recovery; invalid environment name; no-op revision; multi-prompt revision/rollback. Phase 1 cycle 1 PR 2 added characterization tests (revision-graph errors, upgrade/downgrade targets, CLI text output and exit codes, the README example), five strict xfails for known bugs, and eight legacy-history compatibility fixtures. PR 3 added error-type, strict-parsing, canonical-equality, new-content, legacy-warning and CLI-warning tests, and removed three of the five xfails. PR 3b added secret-rule unit tests (built from runtime fragments, never literals), revision blocking, output redaction, history and stale-allowlist warnings. This is **proof of a local prototype**, not extensive production verification.
 
 ## Required suites
 

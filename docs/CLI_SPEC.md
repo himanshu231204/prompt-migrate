@@ -9,18 +9,18 @@ Familiar to Alembic users, transparent in CI, safe by default. Commands distingu
 | Command | Purpose | Important behavior |
 |---|---|---|
 | `promptmigrate init` | Scaffold project | Creates `.promptmigrate/` and starter `assistant.json` |
-| `promptmigrate revision -m "message"` | Generate revision from draft delta | Rejects no-op; parent = source head; refuses drafts that break validation or limits before writing |
-| `promptmigrate diff` | Compare drafts with source migration head | JSON diff to stdout; not env diff |
-| `promptmigrate history` | Print ordered source revisions | Shows ID, parent, message |
+| `promptmigrate revision -m "message"` | Generate revision from draft delta | Rejects no-op; parent = source head; refuses drafts that break validation or limits, and secret-like values in new content, before writing |
+| `promptmigrate diff` | Compare drafts with source migration head | JSON diff to stdout; not env diff; secret-like values shown as <redacted:RULE> |
+| `promptmigrate history` | Print ordered source revisions | Shows ID, parent, message; secret-like messages shown as <redacted:RULE> |
 | `promptmigrate current --env dev` | Show env applied head | Verifies local state first |
 | `promptmigrate upgrade head --env dev` | Advance to source head | SQLite transactional operation |
 | `promptmigrate upgrade <revision> --env dev` | Advance to exact revision | Must be ahead of/equal to current |
 | `promptmigrate downgrade -1 --env dev` | Revert one revision | Default downgrade behavior |
 | `promptmigrate downgrade base --env dev` | Revert all | Restores empty source state |
 | `promptmigrate downgrade <revision> --env dev` | Revert to exact revision | Must be behind/equal to current |
-| `promptmigrate check --env dev` | Check applied integrity/state drift | Does not require env at source head |
+| `promptmigrate check --env dev` | Check applied integrity/state drift | Does not require env at source head; warns about secrets in history and stale allowlist entries |
 | `promptmigrate check --env dev --require-head` | Also require no pending revisions | Helpful for CI |
-| `promptmigrate get sql_agent --env dev` | Read applied local JSON | Only local stored config |
+| `promptmigrate get sql_agent --env dev` | Read applied local JSON | Only local stored config; secret-like values shown as <redacted:RULE> |
 
 **Global flag:** `promptmigrate --project /path/to/project <command>`.
 
@@ -65,8 +65,9 @@ promptmigrate downgrade -1 --env staging
 all subclasses of `MigrationError`); the detailed exit-code mapping arrives with the JSON contract.
 
 **Warnings:** each distinct warning is printed once per invocation to stderr as `Warning: <message>`, before any
-`Error: …` line. Warnings never change the exit code. Today the only warning is the legacy-revision warning for existing
-revision files that break a tier-B rule (see `MIGRATION_PROTOCOL.md`, "Strict parsing and compatibility tiers").
+`Error: …` line. Warnings never change the exit code. Warnings come from existing revision files that break a tier-B
+rule (see `MIGRATION_PROTOCOL.md`, "Strict parsing and compatibility tiers") and from the secret safeguard (redaction,
+secrets in history, stale allowlist entries; see `SECURITY.md`).
 
 **Proposed taxonomy:** `0` success, `2` usage, `3` invalid source/schema, `4` drift/integrity conflict, `5` lock/storage problem, `6` evaluation gate failure, `7` provider error. Introduce only after contract tests and documentation update.
 
@@ -75,7 +76,10 @@ revision files that break a tier-B rule (see `MIGRATION_PROTOCOL.md`, "Strict pa
 - Human output must always indicate environment, target/current revision, applied count, and actionable error.
 - `plan` and `diff` must never mutate environment state.
 - Production-labeled local paths need explicit warning until real production support exists.
-- Secret values must never appear in logs, diffs, or JSON output if they were mistakenly included in drafts (enforce before public release).
+- Secret-like values are blocked in new revision content at `revision` and redacted in `diff`/`get` output, by
+  heuristic detection. Detection can miss secrets. Allowlisted values (bound to a fingerprint) are shown. Secrets
+  already in history are only warned about and redacted in output; they stay in the files and in Git and must be
+  rotated. Redacted output (`redacted` non-empty) must not be used as a config source.
 - Avoid success claims after remote asynchronous operations unless they have been observed/confirmed (future).
 
 ## CLI acceptance test examples

@@ -139,8 +139,9 @@ Tests cover revision generation, history, separate environment revisions, determ
 - Supported migration history is **one linear revision chain**; parallel branches require manual resolution first.
 - Config documents are pure JSON; **no arbitrary migration Python is executed**.
 - No provider API keys or network calls are required.
+- Secret-like values are refused in new revision content and redacted in `diff`/`get` output. Detection is heuristic and can miss secrets; secrets already committed stay in Git and must be rotated.
 
-**Not yet guaranteed:** distributed transactions with model providers; locks across hosts; remote state durability; signed revisions; user authentication/authorization; secret redaction; prompt eval gates; runtime cache invalidation; canary releases; audit-grade append-only history; automated recovery when external APIs partially fail. Never use this MVP to administer live production prompts or production secrets.
+**Not yet guaranteed:** distributed transactions with model providers; locks across hosts; remote state durability; signed revisions; user authentication/authorization; prompt eval gates; runtime cache invalidation; canary releases; audit-grade append-only history; automated recovery when external APIs partially fail. Never use this MVP to administer live production prompts or production secrets.
 
 ## Suggested roadmap
 

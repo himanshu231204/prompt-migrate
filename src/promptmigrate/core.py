@@ -7,6 +7,7 @@ This is deliberately local-only and does not deploy to remote prompt providers.
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import os
@@ -23,12 +24,16 @@ from typing import Any
 
 from .errors import (
     DriftError, InitializationError, IntegrityError, LegacyRevisionWarning, MigrationConflictError, MigrationError,
-    PendingRevisionsError, RevisionGraphError, SchemaError, TargetError,
+    PendingRevisionsError, RevisionGraphError, SchemaError, SecretDetectedError, SecretInHistoryWarning,
+    SecretRedactedWarning, StaleAllowlistWarning, TargetError,
 )
 from . import protocol
+from . import secretscan
 from .protocol import canonical, same
 
 _LEGACY = "revision {rid}: {rule} (accepted for compatibility; create a new revision to fix)"
+ALLOWLIST_FILE = "secret-allowlist.json"
+_REDACTED = "{count} secret-like value(s) redacted from this output; detection is heuristic and can miss secrets"
 
 
 @dataclass(frozen=True)
@@ -97,6 +102,16 @@ def read_drafts(project_dir: Path) -> dict[str, dict[str, Any]]:
     if collisions:
         raise SchemaError(f"Invalid drafts: case-collision {collisions[0]}")
     return drafts
+
+
+def load_allowlist(project_dir: Path) -> list[secretscan.AllowEntry]:
+    """The reviewed secret allowlist (.promptmigrate/secret-allowlist.json); empty when the file is absent."""
+    root = require_init(project_dir)
+    path = root / ALLOWLIST_FILE
+    if not path.exists() and not path.is_symlink():
+        return []
+    value, _raw, _rules = protocol.load_json(path, kind="allowlist", root=root)
+    return secretscan.parse_allowlist(value, path.name)
 
 
 def load_revisions(project_dir: Path) -> list[Revision]:
@@ -213,6 +228,27 @@ def draft_diff(project_dir: Path) -> dict[str, dict[str, Any]]:
     }
 
 
+def redacted_diff(project_dir: Path) -> tuple[dict[str, dict[str, Any]], list[dict[str, str]]]:
+    """draft_diff() for display: secret-like values replaced by "<redacted:RULE>", plus what was redacted.
+
+    Redacted output is not a config source: never feed it back into a draft or an application.
+    """
+    allow = load_allowlist(project_dir)
+    changes, redacted = {}, []
+    for name, change in draft_diff(project_dir).items():
+        sides = {}
+        for side in ("before", "after"):
+            value = change[side]
+            if value is not None:
+                value, paths = secretscan.redact(name, value, allow)
+                redacted += [{"name": name, "side": side, "path": path} for path in paths]
+            sides[side] = value
+        changes[name] = sides
+    if redacted:
+        warnings.warn(_REDACTED.format(count=len(redacted)), SecretRedactedWarning, stacklevel=2)
+    return changes, redacted
+
+
 def revision(project_dir: Path, message: str) -> Revision:
     if not message.strip():
         raise SchemaError("Revision message cannot be empty")
@@ -227,6 +263,12 @@ def revision(project_dir: Path, message: str) -> Revision:
             found = protocol.config_violations(name, change["after"])
             if found:
                 raise SchemaError(f"New revision would be invalid: {', '.join(found)}")
+    allow = load_allowlist(project_dir)
+    findings = [finding for name, change in changes.items() if change["after"] is not None
+                for finding in secretscan.scan(name, change["after"], allow)]
+    findings += secretscan.scan("(message)", {"message": message.strip()}, allow)
+    if findings:
+        raise SecretDetectedError(findings)
     item = {
         "revision": rid,
         "down_revision": parent,
@@ -245,6 +287,11 @@ def revision(project_dir: Path, message: str) -> Revision:
             if carried:
                 warnings.warn(f"revision {rid}: {name} before carries {', '.join(carried)} from history "
                               "(copied for compatibility)", LegacyRevisionWarning, stacklevel=2)
+    for name, change in changes.items():
+        if change["before"] is not None:
+            for finding in secretscan.scan(name, change["before"], allow):
+                warnings.warn(f"{finding.name} {finding.path} {finding.rule} copied from history into before; "
+                              "the credential must be rotated", SecretInHistoryWarning, stacklevel=2)
     root = require_init(project_dir)
     path = root / "versions" / f"{rid}_{re.sub(r'[^a-z0-9]+', '_', message.lower()).strip('_')[:50] or 'revision'}.json"
     path.write_text(text, encoding="utf-8")
@@ -331,6 +378,36 @@ def check(project_dir: Path, env: str, require_head: bool = False) -> tuple[int,
     return count, len(revisions)
 
 
+def audit_secrets(project_dir: Path) -> None:
+    """Warn about secret-like values in source history and about allowlist entries that match nothing.
+
+    Warnings only: `check` verifies integrity, not hygiene. Secrets in history stay in Git and must be rotated.
+    """
+    revisions = load_revisions(project_dir)
+    allow = load_allowlist(project_dir)
+    used: set[secretscan.AllowEntry] = set()
+    for r in revisions:
+        seen: list[secretscan.Finding] = []
+        seen += [f for f in secretscan.scan("(message)", {"message": r.message}, allow, used) if f not in seen]
+        for name, change in r.changes.items():
+            for side in ("before", "after"):
+                if change[side] is not None:
+                    seen += [f for f in secretscan.scan(name, change[side], allow, used) if f not in seen]
+        for finding in seen:
+            warnings.warn(f"revision {r.revision}: {finding.name} {finding.path} {finding.rule}",
+                          SecretInHistoryWarning, stacklevel=2)
+    try:
+        drafts = read_drafts(project_dir)
+    except SchemaError:
+        return  # an unreadable draft is reported by diff/revision; without drafts, staleness is unknown
+    for name, config in drafts.items():
+        secretscan.scan(name, config, allow, used)
+    for entry in allow:
+        if entry not in used:
+            warnings.warn(f"secret allowlist entry {entry.name} {entry.path} {entry.rule} matched nothing in drafts "
+                          "or history", StaleAllowlistWarning, stacklevel=2)
+
+
 def upgrade(project_dir: Path, env: str, target: str = "head") -> list[str]:
     revisions = load_revisions(project_dir)
     targets = [r.revision for r in revisions]
@@ -404,3 +481,26 @@ def get_config(project_dir: Path, env: str, name: str) -> dict[str, Any]:
     if not row:
         raise TargetError(f"No prompt named {name!r} in environment {env!r}")
     return json.loads(row[0])
+
+
+def redacted_config(project_dir: Path, env: str, name: str) -> tuple[dict[str, Any], list[str]]:
+    """get_config() for display: secret-like values replaced by "<redacted:RULE>", plus the redacted paths."""
+    config, paths = secretscan.redact(name, get_config(project_dir, env, name), load_allowlist(project_dir))
+    if paths:
+        warnings.warn(_REDACTED.format(count=len(paths)), SecretRedactedWarning, stacklevel=2)
+    return config, paths
+
+
+def redacted_history(project_dir: Path, load=None) -> tuple[list[Revision], list[str]]:
+    """load_revisions() for display: a secret-like message is replaced by "<redacted:RULE>"; returns the ids redacted."""
+    allow = load_allowlist(project_dir)
+    shown, redacted = [], []
+    for r in (load or load_revisions)(project_dir):
+        value, paths = secretscan.redact("(message)", {"message": r.message}, allow)
+        if paths:
+            r = dataclasses.replace(r, message=value["message"])
+            redacted.append(r.revision)
+        shown.append(r)
+    if redacted:
+        warnings.warn(_REDACTED.format(count=len(redacted)), SecretRedactedWarning, stacklevel=2)
+    return shown, redacted
