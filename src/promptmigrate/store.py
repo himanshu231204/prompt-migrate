@@ -189,7 +189,13 @@ def list_environments(project_dir: Path) -> list[tuple[str, bool]]:
     """List canonical declarations and state-file presence without opening SQLite."""
     environments, _existed = read_environments(project_dir)
     states = _states_dir(project_dir)
-    return [(name, (states / f"{name}.sqlite3").is_file()) for name in sorted(environments, key=str.lower)]
+    result = []
+    for name in sorted(environments, key=str.lower):
+        path = states / f"{name}.sqlite3"
+        if _is_linklike(path):
+            raise StorageError(f"Invalid environment state {name!r}: database path is a symbolic link")
+        result.append((name, path.is_file()))
+    return result
 
 
 def _db_path(project_dir: Path, env: str) -> Path:

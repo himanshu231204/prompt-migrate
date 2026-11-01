@@ -284,6 +284,15 @@ def test_store_list_state_flags_without_writes(project):
     assert snapshot(project) == before
 
 
+def test_store_list_rejects_database_symlink(project):
+    api = store_api()
+    target = pm_dir(project) / "outside.sqlite3"
+    target.touch()
+    symlink_or_skip(pm_dir(project) / "states" / "dev.sqlite3", target)
+    with pytest.raises(errors.StorageError):
+        api.list_environments(project)
+
+
 @pytest.mark.parametrize("operation", ["resolve", "add"])
 @pytest.mark.parametrize("legacy_state", [False, True])
 def test_store_adoption_warning_only_first_successful_mutation(project, operation, legacy_state):
