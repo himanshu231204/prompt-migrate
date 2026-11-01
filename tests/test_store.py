@@ -484,6 +484,33 @@ def test_store_write_setup_failure_closes(project, monkeypatch):
         opened[0].execute("SELECT 1")
 
 
+def test_store_write_closes_if_setup_rollback_raises(project, monkeypatch):
+    api = store_api()
+    real_connect = sqlite3.connect
+    opened = []
+
+    class FailingRollbackConnection(sqlite3.Connection):
+        def execute(self, sql, *args):
+            if sql == "PRAGMA synchronous=FULL":
+                raise sqlite3.OperationalError("injected setup failure")
+            return super().execute(sql, *args)
+
+        def rollback(self):
+            raise sqlite3.OperationalError("injected rollback failure")
+
+    def connect(*args, **kwargs):
+        db = real_connect(*args, **kwargs, factory=FailingRollbackConnection)
+        opened.append(db)
+        return db
+
+    monkeypatch.setattr(sqlite3, "connect", connect)
+    with pytest.raises(sqlite3.OperationalError, match="rollback failure"):
+        with api.connect_write(project, "dev"):
+            pytest.fail("setup failure must not yield")
+    with pytest.raises(sqlite3.ProgrammingError, match="closed"):
+        opened[0].execute("SELECT 1")
+
+
 def test_store_concurrent_first_writes_initialize_schema_once(project):
     api = store_api()
     path = pm_dir(project) / "states" / "dev.sqlite3"

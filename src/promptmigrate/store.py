@@ -258,8 +258,10 @@ def connect_write(project_dir: Path, env: str) -> Iterator[sqlite3.Connection]:
                 """)
             connection.commit()
         except BaseException:
-            connection.rollback()
-            connection.close()
+            try:
+                connection.rollback()
+            finally:
+                connection.close()
             raise
     try:
         yield connection
