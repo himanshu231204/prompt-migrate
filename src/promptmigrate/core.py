@@ -15,8 +15,6 @@ import re
 import sqlite3
 import uuid
 import warnings
-from collections.abc import Iterator
-from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -28,6 +26,7 @@ from .errors import (
     SecretRedactedWarning, StaleAllowlistWarning, TargetError,
 )
 from . import protocol
+from . import store
 from . import secretscan
 from .protocol import canonical, same
 
@@ -74,6 +73,9 @@ def init(project_dir: Path) -> Path:
     (root / "drafts").mkdir()
     (root / "states").mkdir()
     (root / ".gitignore").write_text("/states/\n", encoding="utf-8")
+    (root / "environments.json").write_text(
+        json.dumps({"environments": {"dev": {}, "staging": {}}}, indent=2) + "\n", encoding="utf-8"
+    )
     starter = {
         "messages": [{"role": "system", "content": "You are a helpful AI assistant."}],
         "model": "provider/model-id",
@@ -298,46 +300,6 @@ def revision(project_dir: Path, message: str) -> Revision:
     return load_revisions(project_dir)[-1]
 
 
-def _db_path(project_dir: Path, env: str) -> Path:
-    if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{0,63}", env):
-        raise SchemaError("Environment must be alphanumeric, starting with a letter")
-    return require_init(project_dir) / "states" / f"{env}.sqlite3"
-
-
-@contextmanager
-def _connect(project_dir: Path, env: str) -> Iterator[sqlite3.Connection]:
-    """Yield an env DB connection: commit on success, roll back on error, always close."""
-    path = _db_path(project_dir, env)
-    path.parent.mkdir(exist_ok=True)
-    connection = sqlite3.connect(path, timeout=10)
-    try:
-        connection.execute("PRAGMA busy_timeout=10000")
-        connection.execute("PRAGMA synchronous=FULL")
-        connection.execute("PRAGMA foreign_keys=ON")
-        connection.execute("""
-            CREATE TABLE IF NOT EXISTS applied_revisions (
-                seq INTEGER PRIMARY KEY AUTOINCREMENT,
-                revision TEXT UNIQUE NOT NULL,
-                checksum TEXT NOT NULL,
-                applied_at TEXT NOT NULL
-            )
-        """)
-        connection.execute("""
-            CREATE TABLE IF NOT EXISTS prompts (
-                name TEXT PRIMARY KEY,
-                config TEXT NOT NULL
-            )
-        """)
-        connection.commit()
-        yield connection
-        connection.commit()
-    except BaseException:
-        connection.rollback()
-        raise
-    finally:
-        connection.close()
-
-
 def _applied(db: sqlite3.Connection) -> list[tuple[str, str]]:
     return [(rid, checksum) for rid, checksum in db.execute(
         "SELECT revision, checksum FROM applied_revisions ORDER BY seq"
@@ -370,9 +332,10 @@ def _verify(db: sqlite3.Connection, revisions: list[Revision]) -> int:
 
 
 def check(project_dir: Path, env: str, require_head: bool = False) -> tuple[int, int]:
+    env = store.resolve_environment(project_dir, env)
     revisions = load_revisions(project_dir)
-    with _connect(project_dir, env) as db:
-        count = _verify(db, revisions)
+    with store.connect_readonly(project_dir, env) as db:
+        count = _verify(db, revisions) if db is not None else 0
     if require_head and count != len(revisions):
         raise PendingRevisionsError(f"Environment is behind head: {len(revisions) - count} pending revisions")
     return count, len(revisions)
@@ -409,12 +372,13 @@ def audit_secrets(project_dir: Path) -> None:
 
 
 def upgrade(project_dir: Path, env: str, target: str = "head") -> list[str]:
+    env = store.resolve_environment(project_dir, env, mutating=True)
     revisions = load_revisions(project_dir)
     targets = [r.revision for r in revisions]
     if target != "head" and target not in targets:
         raise TargetError(f"Unknown target revision: {target}")
     target_count = len(revisions) if target == "head" else targets.index(target) + 1
-    with _connect(project_dir, env) as db:
+    with store.connect_write(project_dir, env) as db:
         db.execute("BEGIN IMMEDIATE")
         applied_count = _verify(db, revisions)
         if applied_count > target_count:
@@ -440,9 +404,10 @@ def upgrade(project_dir: Path, env: str, target: str = "head") -> list[str]:
 
 
 def downgrade(project_dir: Path, env: str, target: str = "-1") -> list[str]:
+    env = store.resolve_environment(project_dir, env, mutating=True)
     revisions = load_revisions(project_dir)
     targets = [r.revision for r in revisions]
-    with _connect(project_dir, env) as db:
+    with store.connect_write(project_dir, env) as db:
         db.execute("BEGIN IMMEDIATE")
         applied_count = _verify(db, revisions)
         if target == "-1":
@@ -474,13 +439,27 @@ def downgrade(project_dir: Path, env: str, target: str = "-1") -> list[str]:
 
 
 def get_config(project_dir: Path, env: str, name: str) -> dict[str, Any]:
+    env = store.resolve_environment(project_dir, env)
     revisions = load_revisions(project_dir)
-    with _connect(project_dir, env) as db:
-        _verify(db, revisions)
-        row = db.execute("SELECT config FROM prompts WHERE name=?", (name,)).fetchone()
+    with store.connect_readonly(project_dir, env) as db:
+        if db is None:
+            row = None
+        else:
+            _verify(db, revisions)
+            row = db.execute("SELECT config FROM prompts WHERE name=?", (name,)).fetchone()
     if not row:
         raise TargetError(f"No prompt named {name!r} in environment {env!r}")
     return json.loads(row[0])
+
+
+def env_add(project_dir: Path, name: str) -> Path:
+    require_init(project_dir)
+    return store.add_environment(project_dir, name)
+
+
+def env_list(project_dir: Path) -> list[tuple[str, bool]]:
+    require_init(project_dir)
+    return store.list_environments(project_dir)
 
 
 def redacted_config(project_dir: Path, env: str, name: str) -> tuple[dict[str, Any], list[str]]:
