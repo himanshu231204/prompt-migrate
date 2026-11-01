@@ -7,7 +7,7 @@ import sys
 import warnings
 from pathlib import Path
 from .core import (
-    MigrationError, audit_secrets, check, downgrade, init,
+    MigrationError, audit_secrets, check, downgrade, env_add, env_list, init,
     load_revisions, pretty, redacted_config, redacted_diff, redacted_history, revision, upgrade,
 )
 from .errors import PromptMigrateWarning
@@ -36,6 +36,11 @@ def build_parser() -> argparse.ArgumentParser:
     get = sub.add_parser("get", help="Read a config from a local environment")
     get.add_argument("name")
     get.add_argument("--env", default="dev")
+    env = sub.add_parser("env", help="Manage declared local environments")
+    env_sub = env.add_subparsers(dest="env_command", required=True)
+    add_env = env_sub.add_parser("add", help="Declare a local environment")
+    add_env.add_argument("name")
+    env_sub.add_parser("list", help="List declared environments and local state files")
     return p
 
 
@@ -107,6 +112,13 @@ def _run(args: argparse.Namespace) -> None:
     elif args.command == "get":
         config, _paths = redacted_config(project, args.env, args.name)
         print(pretty(config), end="")
+    elif args.command == "env":
+        if args.env_command == "add":
+            env_add(project, args.name)
+            print(f"Added environment: {args.name}")
+        elif args.env_command == "list":
+            for name, has_state in env_list(project):
+                print(f"{name}: {'state exists' if has_state else 'no state'}")
 
 
 if __name__ == "__main__":
