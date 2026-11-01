@@ -83,6 +83,7 @@ def _print_warnings(caught: list[warnings.WarningMessage]) -> None:
 
 
 def _environment_label(project: Path, env: str) -> str:
+    store._validate_name(env)
     environments, _existed = store.read_environments(project)
     return next((name for name in environments if name.lower() == env.lower()), env)
 

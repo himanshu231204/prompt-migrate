@@ -329,6 +329,13 @@ def test_cli_environment_labels_use_canonical_spelling(project, capsys):
         assert (code, out, err) == (0, output, "")
 
 
+@pytest.mark.parametrize("command", ["current", "check", "upgrade", "downgrade"])
+def test_cli_invalid_environment_syntax_precedes_manifest_parsing(project, capsys, command):
+    (pm_dir(project) / "environments.json").write_text("{", encoding="utf-8")
+    code, out, err = run_cli(capsys, project, command, "--env", "../escape")
+    assert code == 1 and out == "" and err == f"Error: {SYNTAX_MESSAGE}\n"
+
+
 @pytest.mark.parametrize("name", ["DEV", "../escape"])
 def test_cli_env_add_errors(project, capsys, name):
     manifest(project, {"dev": {}})
