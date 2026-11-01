@@ -8,14 +8,12 @@ from pmtest import pm_dir, set_draft, tree_snapshot
 from promptmigrate.core import MigrationError, check, draft_diff, revision
 
 
-@pytest.mark.xfail(strict=True, raises=pytest.fail.Exception, reason="undeclared env reports OK; fixed in PR 4")
 def test_undeclared_env_is_an_error(project):
     revision(project, "initial")
     with pytest.raises(MigrationError):
         check(project, "prdo")
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="read commands create state files; fixed in PR 4")
 def test_check_does_not_create_files(project):
     revision(project, "initial")
     before = tree_snapshot(project)
