@@ -13,6 +13,18 @@ class SchemaError(MigrationError):
     """A draft, revision file or command input is malformed or breaks a validation rule."""
 
 
+class EnvironmentNotDeclaredError(MigrationError):
+    """The requested environment is not present in the declared environment manifest."""
+
+    def __init__(self, env: str) -> None:
+        self.env = env
+        super().__init__(f"Environment {env!r} is not declared; declare it with `promptmigrate env add {env}`.")
+
+
+class StorageError(MigrationError):
+    """The local environment state database is missing required storage or is otherwise unusable."""
+
+
 class SecretDetectedError(SchemaError):
     """New revision content holds a secret-like value that is not allowlisted. Carries findings, never values."""
 
@@ -49,6 +61,14 @@ class PendingRevisionsError(MigrationError):
 
 class PromptMigrateWarning(UserWarning):
     """Base class of every warning PromptMigrate emits."""
+
+
+class ProductionNameWarning(PromptMigrateWarning):
+    """A production-like environment name still refers only to local SQLite state."""
+
+
+class EnvironmentAdoptionWarning(PromptMigrateWarning):
+    """A legacy workspace is being adopted into the declared environment manifest."""
 
 
 class LegacyRevisionWarning(PromptMigrateWarning):
