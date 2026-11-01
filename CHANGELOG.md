@@ -4,6 +4,23 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
 
 ## Unreleased
 
+### Phase 1 cycle 1 — PR 3b: secret safeguard
+
+- **Contract:** `revision` refuses to write a secret-like value in any new `after` value or in its message. It raises
+  `SecretDetectedError` (a `SchemaError`) listing name, JSON path and rule only, and writes no file. A value copied
+  from history into `before` does not block; it prints `SecretInHistoryWarning`, because it is already committed and
+  the credential must be rotated.
+- **Contract:** `diff` and `get` replace each flagged string with `<redacted:RULE>` and print one
+  `SecretRedactedWarning`. Stored data and revision files are unchanged. Redacted output must not be used as a config
+  source.
+- `check` warns once per revision, name, path and rule about secret-like values in history, and about allowlist entries
+  that matched nothing. Warnings do not change the exit code.
+- False positives go in `.promptmigrate/secret-allowlist.json` (Git-tracked, strictly parsed). An entry applies only
+  when its name, path, rule and the SHA-256 fingerprint of the exact value all match.
+- Detection is heuristic: it can miss secrets, and it does nothing for secrets already in Git history.
+- New module `promptmigrate.secretscan`; new `core` functions `load_allowlist`, `redacted_diff`, `redacted_config`
+  and `audit_secrets`. `get_config` and `draft_diff` still return unredacted data.
+
 ### Phase 1 cycle 1 — PR 3: strict parsing, compatibility tiers, canonical equality
 
 - **Contract:** drafts and revision files are parsed strictly. Duplicate keys, `NaN`/`Infinity`/`-Infinity`, number

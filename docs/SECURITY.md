@@ -23,12 +23,15 @@ Unintentional developer mistakes; malformed or malicious pull requests; someone 
 - Basic names/type checks.
 - SQLite transaction for atomic local state and ledger update.
 - Simple environment name validation to restrict output path forms.
+- Heuristic secret safeguard (Phase 1 cycle 1, PR 3b): `revision` refuses secret-like values in new content, and
+  `diff`/`get` redact them in output. See "Secret safeguard" below for its limits.
 
 These are **not** sufficient as an end-to-end production security architecture.
 
 ## Critical missing controls
 
-1. **Secret scanning / prevention** before writing or logging revision content. Git history retains secrets even after deletion.
+1. **Secret scanning / prevention:** **partial (heuristic).** New revision content is scanned and output is redacted,
+   but detection can miss secrets, and it does nothing for secrets already in Git history.
 2. **Repository trust:** revision files can come from untrusted PRs; reviewed/signed artifacts required for production.
 3. **Strict schema validation:** type restrictions, max sizes, deep nesting and ambiguous data.
 4. **Filesystem hardening:** symlinks, concurrent revision writes, unsafe workspace permissions and paths.
@@ -46,6 +49,42 @@ These are **not** sufficient as an end-to-end production security architecture.
 - A changed output schema can break downstream parsers.
 - A changed model identifier may alter accuracy, latency, pricing, and safety behavior.
 - Reverting instructions cannot undo already-executed destructive operations.
+
+## Secret safeguard (heuristic)
+
+Rules apply to every string value, including prompt `content`: OpenAI/Anthropic-style `sk-…` keys, AWS access key
+ids, GitHub tokens, Slack tokens, PEM private-key headers, bearer tokens and JWTs. A further rule flags the value of
+keys named like `api_key`, `password`, `secret`, `client_secret`, `access_token`, `auth_token`, `token` or
+`private_key`, unless it is empty or a `secret://` reference.
+
+| Command | On a finding that is not allowlisted |
+|---|---|
+| `revision` | refuses, writes no file; a value copied into `before` from history only warns |
+| `diff`, `get` | shows `<redacted:RULE>` instead of the string |
+| `check` | warns about history findings and stale allowlist entries; exit code unchanged |
+
+**Limits.** Detection is pattern-based, so it misses secrets that don't look like a known token, and can flag text that
+only looks like one. It does nothing for secrets already committed: those stay in Git history and must be rotated.
+Messages, warnings and errors carry names, JSON paths and rule ids, never the values.
+
+**Allowlist.** `.promptmigrate/secret-allowlist.json` is Git-tracked, so changes to it get code review:
+
+```json
+{"allow": [{"name": "assistant", "path": "/messages/0/content", "rule": "bearer-token",
+            "fingerprint": "sha256:<64 hex>", "reason": "documentation example"}]}
+```
+
+All five keys are required and no others are allowed. `rule` must be a known rule id. An entry suppresses a finding
+only when `name`, `path`, `rule` and `fingerprint` all match. The fingerprint is `sha256:` plus the hex SHA-256 of the
+exact matched text in UTF-8 (for the key-name rule, the whole value). If the value changes, or an array shift moves the
+path, the entry stops matching. Compute a fingerprint for an example you have deliberately approved with:
+
+```bash
+python -c "import hashlib,sys;print('sha256:'+hashlib.sha256(sys.argv[1].encode()).hexdigest())" "<value>"
+```
+
+Only allowlist values that are not secrets. Errors never print fingerprints, because a hash of a weak password can be
+brute-forced.
 
 ## Policy for secrets
 

@@ -167,7 +167,7 @@ For MVP: at most one root and one child per revision. No merge branches, disconn
 - Duplicated full configs increase repository size for frequent revisions.
 - Very large prompts or templates may warrant separate content-addressed assets later.
 - Raw string prompts and runtime-resolved user content must never be conflated.
-- Never serialize secrets; use references like `secret://provider/credential` where needed.
+- Never serialize secrets; use references like `secret://provider/credential` where needed. `revision` refuses secret-like values in new content (heuristic; see `SECURITY.md`).
 - Client code and tool schema may need compatibility constraints recorded alongside config.
 
 ## Future `format_version` proposal (not implemented)

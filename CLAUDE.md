@@ -13,7 +13,7 @@ Workflow, TDD rules, hard rules and the review report format are in [`AGENTS.md`
 - Implemented: `init`, `revision`, `history`, `diff`, `current`, `upgrade`, `downgrade`, `check`, `get`.
 - Current scope: Phase 1, cycle 1, in `docs/ROADMAP.md`.
 - `docs/` also describes future modules and commands (`plan`, `eval`, `export`, Postgres, SDK, …). They don't exist yet.
-- Test baseline: all tests pass on Windows 11 / Python 3.11.9 after Phase 1 cycle 1 PR 3 (2 strict xfails remain for PR 4). Linux/macOS are claimed only once CI runs on a remote.
+- Test baseline: all tests pass on Windows 11 / Python 3.11.9 after Phase 1 cycle 1 PR 3b (2 strict xfails remain for PR 4). Linux/macOS are claimed only once CI runs on a remote.
 
 ## Commands
 
@@ -34,7 +34,7 @@ PYTHONPATH=src python -m promptmigrate --project <dir> history   # CLI from sour
 
 ## Architecture
 
-Logic is in `src/promptmigrate/core.py` (commands, revision parsing, graph, replay, SQLite), `protocol.py` (strict JSON loading, limits, config validation, `canonical`/`same`) and `errors.py` (error and warning types). `cli.py` is a thin argparse dispatcher: it prints any `MigrationError`, `OSError` or `sqlite3.Error` as `Error: …` on stderr and exits 1. It prints captured PromptMigrate warnings once each as `Warning: …` on stderr.
+Logic is in `src/promptmigrate/core.py` (commands, revision parsing, graph, replay, SQLite), `protocol.py` (strict JSON loading, limits, config validation, `canonical`/`same`), `secretscan.py` (heuristic secret rules, fingerprinted allowlist, redaction; no I/O) and `errors.py` (error and warning types). `cli.py` is a thin argparse dispatcher: it prints any `MigrationError`, `OSError` or `sqlite3.Error` as `Error: …` on stderr and exits 1. It prints captured PromptMigrate warnings once each as `Warning: …` on stderr.
 
 **Four states, kept distinct:**
 1. **Drafts:** `.promptmigrate/drafts/<name>.json`, the desired config (one JSON object per name).
