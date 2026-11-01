@@ -22,8 +22,8 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 | 2026-11-01 (after PR 3b) | Windows 11, Python 3.11.9 | `python -m pytest -q` → `262 passed, 8 skipped, 2 xfailed` |
 | 2026-11-01 (after PR 4) | Windows 11, Python 3.11.9 | `.venv/Scripts/python -m pytest -q -rxXs` → `469 passed, 16 skipped, 33 warnings`; original unittest suite → `Ran 7 tests ... OK` |
 
-CI runs Ubuntu, Windows and macOS × Python 3.10, 3.12 and 3.13. Python 3.11 is not in the CI matrix; it is covered only
-by the local Windows merge gate (`AGENTS.md`). CI results count only once the repository has a remote.
+GitHub Actions runs the complete suite inside Linux Docker containers for Python 3.10, 3.12 and 3.13. This does not
+provide native Windows or macOS coverage. Python 3.11 remains covered by the local Windows merge gate (`AGENTS.md`).
 
 Tests currently cover: initial revision and two environments; downgrade; checksum tampering; local drift; bad before-state preconditions; deletion/recovery; invalid environment name; no-op revision; multi-prompt revision/rollback. Phase 1 cycle 1 PR 2 added characterization tests (revision-graph errors, upgrade/downgrade targets, CLI text output and exit codes, the README example), five strict xfails for known bugs, and eight legacy-history compatibility fixtures. PR 3 added error-type, strict-parsing, canonical-equality, new-content, legacy-warning and CLI-warning tests, and removed three of the five xfails. PR 3b added secret-rule unit tests (built from runtime fragments, never literals), revision blocking, output redaction, history and stale-allowlist warnings. PR 4 adds declared-environment schema/adoption, canonical resolution, atomic manifest replacement, read-only SQLite contracts, malformed/missing storage, connection lifecycle, concurrent manifest and initial DB setup, and CLI output/warning coverage. Windows symlink and case-collision paths skip on this host and remain unverified here. This is **proof of a local prototype**, not extensive production verification.
 
@@ -100,7 +100,8 @@ Tests currently cover: initial revision and two environments; downgrade; checksu
 ## Suggested CI stages
 
 1. Static checks / format and type checks.
-2. Unit, graph, property-based tests on the native OS/Python matrix and in the Linux Docker test image (`Dockerfile.ci`).
+2. Unit, graph, property-based, SQLite integration and CLI tests run as one full suite in the Linux Docker test image
+   (`Dockerfile.ci`) for each supported CI Python version.
 3. SQLite integration and fault-injection tests.
 4. CLI documentation examples as executable smoke tests.
 5. Build/package install tests on Linux, macOS, Windows (when supported).
