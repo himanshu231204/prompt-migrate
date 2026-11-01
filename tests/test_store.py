@@ -4,6 +4,8 @@ import json
 import os
 from pathlib import Path
 import sqlite3
+import threading
+import time
 import warnings
 
 import pytest
@@ -105,6 +107,7 @@ def test_store_legacy_discovery_is_in_memory(project, stems, expected):
 
 def test_store_invalid_legacy_stem_is_rejected(project):
     api = store_api()
+    (pm_dir(project) / "environments.json").unlink()
     (pm_dir(project) / "states" / "1bad.sqlite3").touch()
     with pytest.raises(errors.SchemaError):
         api.read_environments(project)
@@ -112,6 +115,7 @@ def test_store_invalid_legacy_stem_is_rejected(project):
 
 def test_store_colliding_legacy_stems_are_rejected(project):
     api = store_api()
+    (pm_dir(project) / "environments.json").unlink()
     states = pm_dir(project) / "states"
     (states / "Qa.sqlite3").touch()
     (states / "qa.sqlite3").touch()
@@ -130,6 +134,20 @@ def test_store_syntax_precedes_manifest_parsing(project, name, operation):
     with pytest.raises(errors.SchemaError) as exc:
         getattr(api, operation)(project, name)
     assert str(exc.value) == SYNTAX_MESSAGE
+    assert snapshot(project) == before
+
+
+@pytest.mark.parametrize("name", ["CON", "prn", "AUX", "nul", "COM1", "lpt9"])
+@pytest.mark.parametrize("operation", ["resolve_environment", "add_environment"])
+def test_store_rejects_windows_reserved_environment_names(project, name, operation):
+    api = store_api()
+    manifest(project, {"dev": {}})
+    before = snapshot(project)
+    with pytest.raises(errors.SchemaError):
+        if operation == "resolve_environment":
+            api.resolve_environment(project, name)
+        else:
+            api.add_environment(project, name)
     assert snapshot(project) == before
 
 
@@ -197,6 +215,53 @@ def test_store_add_atomic_replace_and_temp_cleanup(project, monkeypatch, fail):
     assert len(sources) == 1 and not sources[0].exists()
 
 
+def test_store_concurrent_additions_preserve_both_declarations(project, monkeypatch):
+    api = store_api()
+    manifest(project, {"dev": {}})
+    original_read = api.read_environments
+    original_write = api._write_environments
+    first_read = threading.Event()
+    second_read = threading.Event()
+    count = 0
+    guard = threading.Lock()
+
+    def read(*args, **kwargs):
+        nonlocal count
+        result = original_read(*args, **kwargs)
+        with guard:
+            count += 1
+            current = count
+        if current == 1:
+            first_read.set()
+            second_read.wait(0.2)
+        elif current == 2:
+            second_read.set()
+        return result
+
+    def write(*args, **kwargs):
+        first_read.wait(1)
+        return original_write(*args, **kwargs)
+
+    monkeypatch.setattr(api, "read_environments", read)
+    monkeypatch.setattr(api, "_write_environments", write)
+    failures = []
+
+    def add(name):
+        try:
+            api.add_environment(project, name)
+        except BaseException as exc:
+            failures.append(exc)
+
+    threads = [threading.Thread(target=add, args=(name,)) for name in ("qa", "qb")]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(3)
+    assert not any(thread.is_alive() for thread in threads)
+    assert failures == []
+    assert api.read_environments(project) == ({"dev": {}, "qa": {}, "qb": {}}, True)
+
+
 def test_store_list_state_flags_without_writes(project):
     api = store_api()
     manifest(project, {"staging": {}, "Qa": {}, "dev": {}})
@@ -210,6 +275,7 @@ def test_store_list_state_flags_without_writes(project):
 @pytest.mark.parametrize("legacy_state", [False, True])
 def test_store_adoption_warning_only_first_successful_mutation(project, operation, legacy_state):
     api = store_api()
+    (pm_dir(project) / "environments.json").unlink()
     if legacy_state:
         (pm_dir(project) / "states" / "dev.sqlite3").touch()
     before = snapshot(project)
@@ -233,6 +299,7 @@ def test_store_adoption_warning_only_first_successful_mutation(project, operatio
 
 def test_store_failed_adoption_does_not_warn_or_leave_temp(project, monkeypatch):
     api = store_api()
+    (pm_dir(project) / "environments.json").unlink()
     before = snapshot(project)
 
     def fail(*args):
@@ -319,6 +386,27 @@ def test_store_readonly_rejects_unusable_db_without_repair_and_closes(project, m
         opened[0].execute("SELECT 1")
     assert snapshot(project) == before
     path.unlink()  # Windows detects leaked handles here too.
+
+
+def test_store_readonly_rejects_dangling_database_symlink(project):
+    api = store_api()
+    path = pm_dir(project) / "states" / "dev.sqlite3"
+    symlink_or_skip(path, pm_dir(project) / "states" / "missing-target.sqlite3")
+    with pytest.raises(errors.StorageError):
+        with api.connect_readonly(project, "dev"):
+            pytest.fail("dangling state link must not be reported as base state")
+
+
+def test_store_write_rejects_incomplete_existing_db_without_repair(project):
+    api = store_api()
+    path = pm_dir(project) / "states" / "dev.sqlite3"
+    with closing(sqlite3.connect(path)) as db:
+        db.execute("CREATE TABLE prompts (name TEXT PRIMARY KEY, config TEXT NOT NULL)")
+    before = snapshot(project)
+    with pytest.raises(errors.StorageError):
+        with api.connect_write(project, "dev"):
+            pytest.fail("must not repair an existing incomplete database")
+    assert snapshot(project) == before
 
 
 @pytest.mark.parametrize("fail", [False, True])

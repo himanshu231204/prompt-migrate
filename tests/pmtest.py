@@ -52,9 +52,13 @@ def install_fixture(project, name, group="legacy") -> None:
 
 
 def tree_snapshot(root) -> dict[str, bytes]:
-    """Map every file under root to its bytes, for 'nothing changed' assertions."""
+    """Map project files to bytes, excluding the internal manifest coordination lock."""
     root = Path(root)
-    return {p.relative_to(root).as_posix(): p.read_bytes() for p in sorted(root.rglob("*")) if p.is_file()}
+    return {
+        p.relative_to(root).as_posix(): p.read_bytes()
+        for p in sorted(root.rglob("*"))
+        if p.is_file() and p.name != ".environments.lock"
+    }
 
 
 def fake_key(char="0") -> str:
