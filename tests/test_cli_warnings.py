@@ -21,9 +21,13 @@ def stderr_for(messages):
     return "".join(f"Warning: {m}\n" for m in messages)
 
 
-@pytest.mark.parametrize("name", LEGACY_NAMES)
+@pytest.mark.parametrize("name", [n for n in LEGACY_NAMES if n != "secret_in_history"])
 def test_every_command_prints_each_legacy_warning_once(project, monkeypatch, capsys, name):
-    """`current` loads history twice; it must still print each warning once."""
+    """`current` loads history twice; it must still print each warning once.
+
+    secret_in_history is excluded: from PR 3b its get and check also print secret warnings, which
+    tests/test_secrets_output.py and tests/test_secrets_check.py pin.
+    """
     install_legacy(project, monkeypatch, name)
     expected = stderr_for(m + LEGACY_SUFFIX for m in LEGACY_WARNINGS[name])
     for argv in COMMANDS:

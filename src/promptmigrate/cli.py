@@ -7,8 +7,8 @@ import sys
 import warnings
 from pathlib import Path
 from .core import (
-    MigrationError, check, downgrade, draft_diff, get_config, init,
-    load_revisions, pretty, revision, upgrade,
+    MigrationError, check, downgrade, init,
+    load_revisions, pretty, redacted_config, redacted_diff, revision, upgrade,
 )
 from .errors import PromptMigrateWarning
 
@@ -87,7 +87,8 @@ def _run(args: argparse.Namespace) -> None:
         for r in load_revisions(project):
             print(f"{r.revision} <- {r.down_revision or 'base'} | {r.message}")
     elif args.command == "diff":
-        print(pretty(draft_diff(project)))
+        changes, _redacted = redacted_diff(project)
+        print(pretty(changes))
     elif args.command == "current":
         n, total = check(project, args.env)
         revisions = load_revisions(project)
@@ -102,7 +103,8 @@ def _run(args: argparse.Namespace) -> None:
         n, total = check(project, args.env, args.require_head)
         print(f"OK: {args.env} is consistent ({n}/{total} revisions applied)")
     elif args.command == "get":
-        print(pretty(get_config(project, args.env, args.name)), end="")
+        config, _paths = redacted_config(project, args.env, args.name)
+        print(pretty(config), end="")
 
 
 if __name__ == "__main__":

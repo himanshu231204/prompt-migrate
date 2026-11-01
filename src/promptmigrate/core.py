@@ -23,7 +23,8 @@ from typing import Any
 
 from .errors import (
     DriftError, InitializationError, IntegrityError, LegacyRevisionWarning, MigrationConflictError, MigrationError,
-    PendingRevisionsError, RevisionGraphError, SchemaError, SecretDetectedError, SecretInHistoryWarning, TargetError,
+    PendingRevisionsError, RevisionGraphError, SchemaError, SecretDetectedError, SecretInHistoryWarning,
+    SecretRedactedWarning, TargetError,
 )
 from . import protocol
 from . import secretscan
@@ -31,6 +32,7 @@ from .protocol import canonical, same
 
 _LEGACY = "revision {rid}: {rule} (accepted for compatibility; create a new revision to fix)"
 ALLOWLIST_FILE = "secret-allowlist.json"
+_REDACTED = "{count} secret-like value(s) redacted from this output; detection is heuristic and can miss secrets"
 
 
 @dataclass(frozen=True)
@@ -223,6 +225,27 @@ def draft_diff(project_dir: Path) -> dict[str, dict[str, Any]]:
         for name in sorted(expected.keys() | wanted.keys())
         if not same(expected.get(name), wanted.get(name))
     }
+
+
+def redacted_diff(project_dir: Path) -> tuple[dict[str, dict[str, Any]], list[dict[str, str]]]:
+    """draft_diff() for display: secret-like values replaced by "<redacted:RULE>", plus what was redacted.
+
+    Redacted output is not a config source: never feed it back into a draft or an application.
+    """
+    allow = load_allowlist(project_dir)
+    changes, redacted = {}, []
+    for name, change in draft_diff(project_dir).items():
+        sides = {}
+        for side in ("before", "after"):
+            value = change[side]
+            if value is not None:
+                value, paths = secretscan.redact(name, value, allow)
+                redacted += [{"name": name, "side": side, "path": path} for path in paths]
+            sides[side] = value
+        changes[name] = sides
+    if redacted:
+        warnings.warn(_REDACTED.format(count=len(redacted)), SecretRedactedWarning, stacklevel=2)
+    return changes, redacted
 
 
 def revision(project_dir: Path, message: str) -> Revision:
@@ -427,3 +450,11 @@ def get_config(project_dir: Path, env: str, name: str) -> dict[str, Any]:
     if not row:
         raise TargetError(f"No prompt named {name!r} in environment {env!r}")
     return json.loads(row[0])
+
+
+def redacted_config(project_dir: Path, env: str, name: str) -> tuple[dict[str, Any], list[str]]:
+    """get_config() for display: secret-like values replaced by "<redacted:RULE>", plus the redacted paths."""
+    config, paths = secretscan.redact(name, get_config(project_dir, env, name), load_allowlist(project_dir))
+    if paths:
+        warnings.warn(_REDACTED.format(count=len(paths)), SecretRedactedWarning, stacklevel=2)
+    return config, paths
