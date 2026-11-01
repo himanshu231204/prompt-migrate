@@ -13,6 +13,16 @@ class SchemaError(MigrationError):
     """A draft, revision file or command input is malformed or breaks a validation rule."""
 
 
+class SecretDetectedError(SchemaError):
+    """New revision content holds a secret-like value that is not allowlisted. Carries findings, never values."""
+
+    def __init__(self, findings) -> None:
+        self.findings = [{"name": f.name, "path": f.path, "rule": f.rule} for f in findings]
+        listed = "; ".join(f"{f['name']} {f['path']} {f['rule']}" for f in self.findings)
+        super().__init__(f"Secret-like values in new revision content: {listed}. "
+                         "No file was written; remove them or allowlist a reviewed false positive.")
+
+
 class RevisionGraphError(MigrationError):
     """Source history is not one linear chain: duplicate id, several roots, missing parent, branch or cycle."""
 
@@ -43,3 +53,15 @@ class PromptMigrateWarning(UserWarning):
 
 class LegacyRevisionWarning(PromptMigrateWarning):
     """An existing revision file breaks a tier-B rule; it is accepted for compatibility."""
+
+
+class SecretRedactedWarning(PromptMigrateWarning):
+    """Secret-like values were redacted from this command's output."""
+
+
+class SecretInHistoryWarning(PromptMigrateWarning):
+    """A secret-like value is in committed history; it stays in Git and must be rotated."""
+
+
+class StaleAllowlistWarning(PromptMigrateWarning):
+    """A secret allowlist entry matched nothing in drafts or history."""
