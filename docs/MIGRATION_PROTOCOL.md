@@ -156,7 +156,17 @@ The current implementation stores `SHA-256(raw revision file bytes)` in the `app
 
 ## Environment names
 
-Current regex: `[A-Za-z][A-Za-z0-9_-]{0,63}`. Each name maps to a local database file under `states/`. **`--env prod` means only local `prod.sqlite3`; it does not mean actual production.**
+`.promptmigrate/environments.json` declares the allowed local environments:
+
+```json
+{"environments": {"dev": {}, "staging": {}}}
+```
+
+The root object has exactly one `environments` object. Names match `[A-Za-z][A-Za-z0-9_-]{0,63}`, are unique case-insensitively, and cannot be Windows device names. Metadata values are JSON objects, limited by the existing control-file byte and nesting limits. Unknown metadata is retained when adding an environment. Case-insensitive lookup always uses the manifest's canonical spelling for the SQLite filename.
+
+Without a manifest, the store infers declarations from valid `states/*.sqlite3` stems in memory; if none exist, it infers `dev` and `staging`. Reads do not write this inferred manifest. The first successful mutating operation atomically writes it and emits one adoption warning. Invalid/colliding legacy stems fail closed. New manifest additions serialize their read-modify-replace operation.
+
+`check`, `current`, and `get` open existing state with SQLite `mode=ro`; `env list` checks filenames only. Missing DB means the empty base state. Existing DBs must contain both `applied_revisions` and `prompts`; missing tables, corrupt files, or state symlinks are storage errors and are not repaired. `upgrade` and `downgrade` initialize only an absent DB and perform state plus ledger changes in one SQLite transaction. **`--env prod` means only local `prod.sqlite3`; it does not mean actual production.** Names `prod`, `production`, and `live` produce an explicit local-only warning.
 
 ## Revision-graph guarantees
 

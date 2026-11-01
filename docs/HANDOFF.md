@@ -3,7 +3,7 @@
 > **Working project name:** PromptMigrate  
 > **Tagline:** Alembic for production AI prompts and agent configurations.  
 > **Status:** design/handoff + an **existing local-only Python prototype**, not a production-ready deployment platform.  
-> **Updated:** 2026-10-29  
+> **Updated:** 2026-11-01
 > **Primary goal:** give Claude or another engineer enough context to critique, refine, and implement the project without changing its core intent.
 
 ## Read this first
@@ -64,8 +64,11 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 | 2026-10-30 (after PR 2) | Windows 11, Python 3.11.9 | `python -m pytest -q` → `45 passed, 1 skipped, 5 xfailed` |
 | 2026-10-31 (after PR 3) | Windows 11, Python 3.11.9 | `python -m pytest -q` → `147 passed, 7 skipped, 2 xfailed` |
 | 2026-11-01 (after PR 3b) | Windows 11, Python 3.11.9 | `python -m pytest -q` → `262 passed, 8 skipped, 2 xfailed` |
+| 2026-11-01 (after PR 4) | Windows 11, Python 3.11.9 | `.venv/Scripts/python -m pytest -q -rxXs` → `461 passed, 16 skipped, 33 warnings`; original unittest suite → `Ran 7 tests ... OK` |
 
-Implemented there: `init`, `revision`, `diff`, `history`, `current`, `upgrade`, `downgrade`, `check`, `get`; Git-trackable JSON revisions; per-environment **local** SQLite files; snapshots; checksums of raw migration files at apply time; state drift detection; one linear history; multi-prompt changes in one SQLite transaction.
+Implemented there: `init`, `revision`, `diff`, `history`, `current`, `upgrade`, `downgrade`, `check`, `get`, `env add`, and `env list`; Git-trackable JSON revisions and declared environment manifest; per-environment **local** SQLite files; read-only inspection; legacy manifest adoption; snapshots; checksums of raw migration files at apply time; state drift detection; one linear history; multi-prompt changes in one SQLite transaction.
+
+The PR 4 skips are Windows host limits: symlinks/reparse points cannot be created by this account, and case-colliding SQLite stems cannot coexist on its case-insensitive filesystem. The prior Linux result is historical and was not rerun for PR 4; no current Linux/macOS result is claimed.
 
 **Not implemented/verified:** strict config schema, `plan`, evaluation gates, external providers, shared production ledger, centralized rollout, distributed consistency, signed artifacts, comprehensive concurrency/fault injection, audit-grade access controls. The prototype's `prod` environment name is only a *local SQLite file*, never a deployment to a production system.
 

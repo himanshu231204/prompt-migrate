@@ -32,6 +32,8 @@ In a separate empty project directory:
 
 ```bash
 promptmigrate init
+promptmigrate env list
+promptmigrate env add qa
 # Edit .promptmigrate/drafts/assistant.json with the desired system prompt,
 # model, temperature, tool specs, response schema, etc.
 promptmigrate revision -m "initial assistant prompt"
@@ -92,6 +94,8 @@ The tool generates a JSON revision like this (abbreviated):
 | `downgrade base --env dev` | Revert all applied revisions |
 | `check --env dev --require-head` | Detect drift, tampered migration files, and pending changes |
 | `get assistant --env dev` | Read a local environment's active prompt config |
+| `env add qa` | Declare a local environment without creating its database |
+| `env list` | List declared environments and whether local state exists |
 
 To target a different local repository location, use the global flag `promptmigrate --project /path/to/repo history`.
 
@@ -102,6 +106,7 @@ project/
   .promptmigrate/
     drafts/                # desired JSON prompt configurations (Git tracked)
       assistant.json
+    environments.json      # declared local environment names and metadata (Git tracked)
     versions/              # migrations with before/after state (Git tracked)
       <revision>_<message>.json
     states/                # local environment SQLite databases (gitignored)
@@ -111,6 +116,8 @@ project/
 ```
 
 `states/prod.sqlite3` is only a **local simulation named prod**, not a shared or production deployment state! For true multi-host environments we need a central Postgres-backed coordination service / provider adapter and an atomic activation pointer. Never mistake local SQLite files for globally deployed state.
+
+`init` declares `dev` and `staging`. Environment names resolve case-insensitively to their canonical spelling in `environments.json`. Existing projects without that file are inferred in memory; the first successful mutation persists the inferred declarations and prints an adoption warning. `check`, `current`, and `get` use read-only database connections; missing state is the empty base state, and reads never create or repair databases. `env list` reports `<name>: state exists` or `<name>: no state` without opening SQLite.
 
 ## CI example
 
