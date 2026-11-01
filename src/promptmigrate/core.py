@@ -24,7 +24,7 @@ from typing import Any
 from .errors import (
     DriftError, InitializationError, IntegrityError, LegacyRevisionWarning, MigrationConflictError, MigrationError,
     PendingRevisionsError, RevisionGraphError, SchemaError, SecretDetectedError, SecretInHistoryWarning,
-    SecretRedactedWarning, TargetError,
+    SecretRedactedWarning, StaleAllowlistWarning, TargetError,
 )
 from . import protocol
 from . import secretscan
@@ -375,6 +375,35 @@ def check(project_dir: Path, env: str, require_head: bool = False) -> tuple[int,
     if require_head and count != len(revisions):
         raise PendingRevisionsError(f"Environment is behind head: {len(revisions) - count} pending revisions")
     return count, len(revisions)
+
+
+def audit_secrets(project_dir: Path) -> None:
+    """Warn about secret-like values in source history and about allowlist entries that match nothing.
+
+    Warnings only: `check` verifies integrity, not hygiene. Secrets in history stay in Git and must be rotated.
+    """
+    revisions = load_revisions(project_dir)
+    allow = load_allowlist(project_dir)
+    used: set[secretscan.AllowEntry] = set()
+    for r in revisions:
+        seen: list[secretscan.Finding] = []
+        for name, change in r.changes.items():
+            for side in ("before", "after"):
+                if change[side] is not None:
+                    seen += [f for f in secretscan.scan(name, change[side], allow, used) if f not in seen]
+        for finding in seen:
+            warnings.warn(f"revision {r.revision}: {finding.name} {finding.path} {finding.rule}",
+                          SecretInHistoryWarning, stacklevel=2)
+    try:
+        drafts = read_drafts(project_dir)
+    except SchemaError:
+        return  # an unreadable draft is reported by diff/revision; without drafts, staleness is unknown
+    for name, config in drafts.items():
+        secretscan.scan(name, config, allow, used)
+    for entry in allow:
+        if entry not in used:
+            warnings.warn(f"secret allowlist entry {entry.name} {entry.path} {entry.rule} matched nothing in drafts "
+                          "or history", StaleAllowlistWarning, stacklevel=2)
 
 
 def upgrade(project_dir: Path, env: str, target: str = "head") -> list[str]:

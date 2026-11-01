@@ -7,7 +7,7 @@ import sys
 import warnings
 from pathlib import Path
 from .core import (
-    MigrationError, check, downgrade, init,
+    MigrationError, audit_secrets, check, downgrade, init,
     load_revisions, pretty, redacted_config, redacted_diff, revision, upgrade,
 )
 from .errors import PromptMigrateWarning
@@ -100,6 +100,7 @@ def _run(args: argparse.Namespace) -> None:
         ids = downgrade(project, args.env, args.target)
         print(f"{args.env}: reverted {len(ids)} revision(s): {', '.join(ids) or '(nothing to revert)'}")
     elif args.command == "check":
+        audit_secrets(project)
         n, total = check(project, args.env, args.require_head)
         print(f"OK: {args.env} is consistent ({n}/{total} revisions applied)")
     elif args.command == "get":
