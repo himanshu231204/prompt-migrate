@@ -73,6 +73,7 @@ def test_undeclared_error_type_carries_env():
     b'{"environments": {"dev": {"x": NaN}}}',
     b'{"environments": {"dev": {"x": Infinity}}}',
     b'{"environments": {"dev": {"x": 1e999}}}',
+    pytest.param(b"[" * 200_000 + b"]" * 200_000, id="nested_json_too_deep"),
 ])
 def test_strict_loader_rejects_invalid_json(project, raw):
     path = pm_dir(project) / "environments.json"
