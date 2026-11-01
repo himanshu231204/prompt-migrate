@@ -135,12 +135,14 @@ def test_unknown_metadata_is_retained(project):
 
 @pytest.mark.parametrize("name", ["", "../escape", "1qa", "a.b", "a/b", "a\\b", "a b", "équipe", "a" * 65])
 def test_invalid_name_before_manifest_parsing(project, name):
+    from test_read_only_env import snapshot
+
     (pm_dir(project) / "environments.json").write_text("{", encoding="utf-8")
-    before = tree_snapshot(project)
+    before = snapshot(project)
     with pytest.raises(errors.SchemaError) as exc:
         core.check(project, name)
     assert str(exc.value) == SYNTAX_MESSAGE
-    assert tree_snapshot(project) == before
+    assert snapshot(project) == before
 
 
 @pytest.mark.parametrize("name", ["a", "Qa_2-local", "a" * 64])
