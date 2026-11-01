@@ -1,8 +1,9 @@
 """Direct PR4 store contracts, independent of core/CLI integration."""
-from contextlib import closing
+from contextlib import closing, contextmanager
 import json
 import os
 from pathlib import Path
+from pathlib import PureWindowsPath
 import sqlite3
 import threading
 import time
@@ -380,6 +381,32 @@ def test_store_readonly_uri_escaping_and_close_on_body_failure(project, monkeypa
     assert snapshot(special) == before
 
 
+def test_store_readonly_rejects_wal_mode_without_creating_sidecars(project):
+    api = store_api()
+    path = pm_dir(project) / "states" / "dev.sqlite3"
+    with closing(sqlite3.connect(path)) as db:
+        db.execute("PRAGMA journal_mode=WAL")
+        db.execute("CREATE TABLE prompts (name TEXT PRIMARY KEY, config TEXT NOT NULL)")
+        db.execute("CREATE TABLE applied_revisions (seq INTEGER PRIMARY KEY, revision TEXT, checksum TEXT, applied_at TEXT)")
+    Path(f"{path}-wal").unlink(missing_ok=True)
+    Path(f"{path}-shm").unlink(missing_ok=True)
+    before = snapshot(project)
+    with pytest.raises(errors.StorageError, match="WAL"):
+        with api.connect_readonly(project, "dev"):
+            pytest.fail("WAL mode is not supported for non-mutating reads without sidecars")
+    assert snapshot(project) == before
+
+
+def test_store_builds_authority_free_unc_sqlite_uri():
+    api = store_api()
+    uri = api._sqlite_uri(PureWindowsPath(r"\\server\share\folder with #\dev.sqlite3"))
+    from urllib.parse import urlsplit
+    parts = urlsplit(uri)
+    assert parts.scheme == "file" and parts.netloc == ""
+    assert parts.path.startswith("//server/share/")
+    assert "%20" in parts.path and "%23" in parts.path and parts.query == "mode=ro"
+
+
 @pytest.mark.parametrize("missing", ["prompts", "applied_revisions", "both", "corrupt"])
 def test_store_readonly_rejects_unusable_db_without_repair_and_closes(project, monkeypatch, missing):
     api = store_api()
@@ -491,6 +518,7 @@ def test_store_write_setup_failure_closes(project, monkeypatch):
             pytest.fail("setup failure must not yield")
     with pytest.raises(sqlite3.ProgrammingError, match="closed"):
         opened[0].execute("SELECT 1")
+    assert not (pm_dir(project) / "states" / "dev.sqlite3").exists()
 
 
 def test_store_write_closes_if_setup_rollback_raises(project, monkeypatch):
@@ -518,6 +546,7 @@ def test_store_write_closes_if_setup_rollback_raises(project, monkeypatch):
             pytest.fail("setup failure must not yield")
     with pytest.raises(sqlite3.ProgrammingError, match="closed"):
         opened[0].execute("SELECT 1")
+    assert not (pm_dir(project) / "states" / "dev.sqlite3").exists()
 
 
 def test_store_concurrent_first_writes_initialize_schema_once(project):
@@ -550,8 +579,19 @@ def test_store_second_writer_waits_for_first_schema_initialization(project, monk
     path = pm_dir(project) / "states" / "dev.sqlite3"
     real_connect = sqlite3.connect
     created = threading.Event()
+    second_lock_requested = threading.Event()
     release_setup = threading.Event()
     first_connection = True
+    original_lock = api._project_lock
+
+    @contextmanager
+    def observe_second_lock(project_dir):
+        if threading.current_thread().name == "second-writer":
+            second_lock_requested.set()
+        with original_lock(project_dir):
+            yield
+
+    monkeypatch.setattr(api, "_project_lock", observe_second_lock)
 
     class PausedConnection(sqlite3.Connection):
         def execute(self, sql, *args):
@@ -582,9 +622,19 @@ def test_store_second_writer_waits_for_first_schema_initialization(project, monk
     first.start()
     assert created.wait(2)
     second.start()
-    time.sleep(0.05)
+    assert second_lock_requested.wait(2)
     release_setup.set()
     first.join(4)
     second.join(4)
     assert not first.is_alive() and not second.is_alive()
     assert failures == []
+
+
+def test_store_readonly_rejects_regular_file_as_states_directory(project):
+    api = store_api()
+    states = pm_dir(project) / "states"
+    states.rmdir()
+    states.write_text("not a directory", encoding="utf-8")
+    with pytest.raises(errors.StorageError):
+        with api.connect_readonly(project, "dev"):
+            pytest.fail("invalid states directory must not be treated as empty base state")

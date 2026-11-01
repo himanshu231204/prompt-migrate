@@ -15,6 +15,7 @@ import re
 import sqlite3
 import tempfile
 from typing import Any
+from urllib.parse import quote
 import warnings
 
 from . import protocol
@@ -53,7 +54,25 @@ def _states_dir(project_dir: Path) -> Path:
     path = _root(project_dir) / "states"
     if _is_linklike(path):
         raise StorageError("Invalid environment state: states directory is a symbolic link or junction")
+    if path.exists() and not path.is_dir():
+        raise StorageError("Invalid environment state: states path is not a directory")
     return path
+
+
+def _sqlite_uri(path: Path) -> str:
+    """Build a read-only SQLite URI without treating a Windows UNC host as authority."""
+    if path.drive.startswith("\\\\"):
+        return "file://" + quote(path.as_posix(), safe="/") + "?mode=ro"
+    return path.as_uri() + "?mode=ro"
+
+
+def _wal_mode(path: Path) -> bool:
+    try:
+        with path.open("rb") as database:
+            header = database.read(20)
+    except OSError as exc:
+        raise StorageError(f"Cannot inspect environment state: {exc}") from exc
+    return header.startswith(b"SQLite format 3\0") and len(header) >= 20 and 2 in header[18:20]
 
 
 def read_environments(project_dir: Path) -> tuple[dict[str, dict[str, Any]], bool]:
@@ -218,7 +237,9 @@ def connect_readonly(project_dir: Path, env: str) -> Iterator[sqlite3.Connection
     connection = None
     try:
         try:
-            connection = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True, timeout=10)
+            if _wal_mode(path):
+                raise StorageError(f"Invalid environment state {env!r}: WAL journal mode is unsupported for read-only inspection")
+            connection = sqlite3.connect(_sqlite_uri(path), uri=True, timeout=10)
             tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             if not {"applied_revisions", "prompts"} <= tables:
                 raise StorageError(f"Invalid environment state {env!r}: missing required tables")
@@ -238,8 +259,9 @@ def connect_write(project_dir: Path, env: str) -> Iterator[sqlite3.Connection]:
         path = _db_path(project_dir, env)
         path.parent.mkdir(exist_ok=True)
         existed = path.exists()
-        connection = sqlite3.connect(path, timeout=10)
+        connection = None
         try:
+            connection = sqlite3.connect(path, timeout=10)
             connection.execute("PRAGMA busy_timeout=10000")
             connection.execute("PRAGMA synchronous=FULL")
             connection.execute("PRAGMA foreign_keys=ON")
@@ -265,10 +287,17 @@ def connect_write(project_dir: Path, env: str) -> Iterator[sqlite3.Connection]:
             connection.commit()
         except BaseException:
             try:
-                connection.rollback()
+                if connection is not None:
+                    try:
+                        connection.rollback()
+                    finally:
+                        connection.close()
             finally:
-                connection.close()
+                if not existed:
+                    for suffix in ("", "-wal", "-shm"):
+                        Path(f"{path}{suffix}").unlink(missing_ok=True)
             raise
+        assert connection is not None
     try:
         yield connection
         connection.commit()

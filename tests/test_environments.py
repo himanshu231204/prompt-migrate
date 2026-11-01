@@ -316,6 +316,19 @@ def test_cli_env_add_list_and_state_flags(project, capsys):
         0, "dev: state exists\nQa: no state\nstaging: no state\n", "")
 
 
+def test_cli_environment_labels_use_canonical_spelling(project, capsys):
+    manifest(project, {"Qa": {}})
+    expected = {
+        "current": "Qa: base (0/0 applied)\n",
+        "check": "OK: Qa is consistent (0/0 revisions applied)\n",
+        "upgrade": "Qa: applied 0 revision(s): (already current)\n",
+        "downgrade": "Qa: reverted 0 revision(s): (nothing to revert)\n",
+    }
+    for command, output in expected.items():
+        code, out, err = run_cli(capsys, project, command, "--env", "qa")
+        assert (code, out, err) == (0, output, "")
+
+
 @pytest.mark.parametrize("name", ["DEV", "../escape"])
 def test_cli_env_add_errors(project, capsys, name):
     manifest(project, {"dev": {}})
