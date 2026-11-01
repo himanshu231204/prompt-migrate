@@ -1,4 +1,5 @@
 """Shared helpers for the PromptMigrate test suite (imported directly by test modules)."""
+import hashlib
 import json
 import shutil
 import warnings
@@ -56,12 +57,28 @@ def tree_snapshot(root) -> dict[str, bytes]:
     return {p.relative_to(root).as_posix(): p.read_bytes() for p in sorted(root.rglob("*")) if p.is_file()}
 
 
+def fake_key(char="0") -> str:
+    """An OpenAI-shaped fake key, built at runtime so no token-shaped literal is committed."""
+    return "sk-" + char * 24
+
+
+def allow_entry(name, path, rule, value, reason="documentation example") -> dict:
+    """A secret-allowlist entry bound to the SHA-256 fingerprint of `value`."""
+    digest = hashlib.sha256(value.encode("utf-8")).hexdigest()
+    return {"name": name, "path": path, "rule": rule, "fingerprint": "sha256:" + digest, "reason": reason}
+
+
+def write_allowlist(project, entries) -> Path:
+    path = pm_dir(project) / "secret-allowlist.json"
+    path.write_text(json.dumps({"allow": entries}), encoding="utf-8")
+    return path
+
+
 LARGE_CONTENT_BYTES = 65536  # PR 3 patches the revision-size limit below this value for the large_revision case only
 
 
 def secret_in_history(project):
-    token = "sk-" + "0" * 24  # built at runtime: never commit a token-shaped literal
-    write_revision(project, LEGACY_ID, None, {"assistant": create({**CFG, "note": token})})
+    write_revision(project, LEGACY_ID, None, {"assistant": create({**CFG, "note": fake_key()})})
 
 
 def large_revision(project):
