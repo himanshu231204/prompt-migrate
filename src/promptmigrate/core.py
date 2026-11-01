@@ -23,7 +23,7 @@ from typing import Any
 from .errors import (
     DriftError, InitializationError, IntegrityError, LegacyRevisionWarning, MigrationConflictError, MigrationError,
     PendingRevisionsError, RevisionGraphError, SchemaError, SecretDetectedError, SecretInHistoryWarning,
-    SecretRedactedWarning, StaleAllowlistWarning, TargetError,
+    SecretRedactedWarning, StaleAllowlistWarning, StorageError, TargetError,
 )
 from . import protocol
 from . import store
@@ -313,7 +313,10 @@ def _actual(db: sqlite3.Connection) -> dict[str, dict[str, Any]]:
 
 
 def _verify(db: sqlite3.Connection, revisions: list[Revision]) -> int:
-    applied = _applied(db)
+    try:
+        applied = _applied(db)
+    except sqlite3.Error as exc:
+        raise StorageError("Corrupt environment state") from exc
     if len(applied) > len(revisions):
         raise IntegrityError("Environment contains more applied revisions than source history")
     for index, (rid, checksum) in enumerate(applied):
@@ -323,7 +326,10 @@ def _verify(db: sqlite3.Connection, revisions: list[Revision]) -> int:
         if checksum != source.checksum:
             raise IntegrityError(f"Migration file was modified after apply: {rid}")
     expected = replay_revisions(revisions[:len(applied)])
-    actual = _actual(db)
+    try:
+        actual = _actual(db)
+    except (sqlite3.Error, ValueError, TypeError) as exc:
+        raise StorageError("Corrupt environment state") from exc
     names = sorted(name for name in actual.keys() | expected.keys()
                    if not same(actual.get(name), expected.get(name)))
     if names:

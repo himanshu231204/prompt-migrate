@@ -94,6 +94,40 @@ def test_missing_required_table_is_storage_error_without_repair(project, capsys,
     assert snapshot(project) == before
 
 
+@pytest.mark.parametrize("corruption", ["applied_columns", "invalid_json", "null_config"])
+@pytest.mark.parametrize("command", ["check", "current", "get"])
+def test_corrupt_state_reads_are_storage_errors_without_repair(project, capsys, corruption, command):
+    manifest(project, {"dev": {}})
+    core.revision(project, "initial")
+    core.upgrade(project, "dev")
+    path = pm_dir(project) / "states" / "dev.sqlite3"
+    with closing(sqlite3.connect(path)) as db, db:
+        if corruption == "applied_columns":
+            db.execute("ALTER TABLE applied_revisions RENAME TO old_applied_revisions")
+            db.execute("CREATE TABLE applied_revisions (invalid_column TEXT)")
+            db.execute("DROP TABLE old_applied_revisions")
+        elif corruption == "invalid_json":
+            db.execute("UPDATE prompts SET config='not-json' WHERE name='assistant'")
+        else:
+            db.execute("DROP TABLE prompts")
+            db.execute("CREATE TABLE prompts (name TEXT PRIMARY KEY, config TEXT)")
+            db.execute("INSERT INTO prompts VALUES ('assistant', NULL)")
+    before = snapshot(project)
+    with pytest.raises(errors.StorageError):
+        if command == "get":
+            core.get_config(project, "dev", "assistant")
+        else:
+            core.check(project, "dev")
+    assert snapshot(project) == before
+    argv = [command]
+    if command == "get":
+        argv.append("assistant")
+    argv.extend(["--env", "dev"])
+    code, out, err = run_cli(capsys, project, *argv)
+    assert code == 1 and out == "" and err.startswith("Error: ")
+    assert snapshot(project) == before
+
+
 @pytest.mark.parametrize("command", ["check", "current", "get"])
 def test_reads_open_escaped_sqlite_uri_mode_ro(tmp_path, monkeypatch, capsys, command):
     project = tmp_path / "space and # fragment"
