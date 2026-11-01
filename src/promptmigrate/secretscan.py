@@ -33,6 +33,8 @@ RULE_IDS: tuple[str, ...] = (*VALUE_RULES, KEY_RULE)
 
 _FIELDS = ("name", "path", "rule", "fingerprint", "reason")
 _FINGERPRINT = re.compile(r"sha256:[0-9a-f]{64}")
+_SHOWABLE = re.compile(r"[a-z0-9_-]{1,40}")
+_JWT_START = re.compile(r"eyJ[A-Za-z0-9_-]*")
 
 
 @dataclass(frozen=True)
@@ -77,12 +79,29 @@ def _strings(config: Any) -> Iterator[tuple[tuple[str | int, ...], str | None, s
             yield parts, key, value
 
 
+def _jwt_matches(text: str) -> Iterator[str]:
+    """VALUE_RULES["jwt"] matches, found in linear time.
+
+    A later "eyJ" inside the same [A-Za-z0-9_-] run shares the run's tail and is shorter, so if the full pattern fails
+    at the run's first "eyJ" it fails at every later one: skip to the end of the run.
+    """
+    pattern, pos = VALUE_RULES["jwt"], 0
+    while (start := _JWT_START.search(text, pos)) is not None:
+        full = pattern.match(text, start.start())
+        if full is not None:
+            yield full.group(0)
+            pos = full.end()
+        else:
+            pos = start.end()
+
+
 def _matches(config: Any) -> Iterator[tuple[tuple[str | int, ...], str, str]]:
     """(path parts, rule, matched substring): value rules in table order, then the key rule."""
     for parts, key, text in _strings(config):
         for rule, pattern in VALUE_RULES.items():
-            for match in pattern.finditer(text):
-                yield parts, rule, match.group(0)
+            found = _jwt_matches(text) if rule == "jwt" else (m.group(0) for m in pattern.finditer(text))
+            for matched in found:
+                yield parts, rule, matched
         if key is not None and _SECRET_KEY.search(key) and text and not text.startswith("secret://"):
             yield parts, KEY_RULE, text
 

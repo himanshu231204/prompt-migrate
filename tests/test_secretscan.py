@@ -1,5 +1,6 @@
 """PR 3b: heuristic secret detection, allowlist parsing and redaction (pure functions, no I/O)."""
 import re
+import time
 
 import pytest
 
@@ -73,6 +74,24 @@ def test_value_rule_positive(rule, sample):
 @pytest.mark.parametrize("sample", NEGATIVE)
 def test_value_rule_negative(sample):
     assert secretscan.scan("assistant", prompt(sample)) == []
+
+
+def test_jwt_scan_is_linear_on_adversarial_input():
+    text = "eyJ" * 70_000 + "."
+    start = time.perf_counter()
+    secretscan.scan("a", prompt(text))
+    assert time.perf_counter() - start < 2
+
+
+def test_jwt_found_after_a_failed_run():
+    text = "eyJ" + "x" * 3 + " " + "eyJ" + "g" * 12 + "." + "h" * 12 + "." + "i" * 12
+    assert secretscan.scan("a", prompt(text)) == [Finding("a", CONTENT, "jwt")]
+
+
+def test_jwt_inside_longer_text():
+    token = "eyJ" + "g" * 12 + "." + "h" * 12 + "." + "i" * 12
+    text = "token=" + token + " end"
+    assert secretscan.scan("a", prompt(text)) == [Finding("a", CONTENT, "jwt")]
 
 
 def test_embedded_in_a_longer_prompt_is_detected():
