@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from pmtest import CFG, GENERATED, allow_entry, fake_key, pm_warnings, set_draft, write_allowlist
+from pmtest import CFG, GENERATED, LEGACY_ID, allow_entry, create, fake_key, pm_warnings, set_draft, write_allowlist, write_revision
 from promptmigrate import cli
 from promptmigrate.core import get_config, redacted_config, redacted_diff, upgrade
 
@@ -84,3 +84,19 @@ def test_blocked_revision_never_prints_the_value(project, capsys):
     assert code == 1  # exit code 3 is asserted from PR 6
     assert TOKEN not in out + err
     assert err.startswith("Error: Secret-like values in new revision content: assistant /note openai-anthropic-key.")
+
+
+def test_history_redacts_a_secret_message(project, capsys):
+    write_revision(project, LEGACY_ID, None, {"assistant": create(CFG)}, message="rotate " + TOKEN)
+    code, out, err = run(capsys, project, "history")
+    assert (code, err) == (0, f"Warning: {REDACTED_WARNING}\n")
+    assert out == f"{LEGACY_ID} <- base | <redacted:openai-anthropic-key>\n"
+    assert TOKEN not in out
+
+
+def test_history_shows_an_allowlisted_message(project, capsys):
+    write_revision(project, LEGACY_ID, None, {"assistant": create(CFG)}, message="rotate " + TOKEN)
+    write_allowlist(project, [allow_entry("(message)", "/message", "openai-anthropic-key", TOKEN)])
+    code, out, err = run(capsys, project, "history")
+    assert (code, err) == (0, "")
+    assert TOKEN in out

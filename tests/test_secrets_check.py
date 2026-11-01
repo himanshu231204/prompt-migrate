@@ -85,3 +85,15 @@ def test_current_does_not_audit(project, capsys):
     """Plan decision E2."""
     GENERATED["secret_in_history"](project)
     assert run(capsys, project, "current")[2] == ""
+
+
+def test_history_message_secret_is_reported(project):
+    write_revision(project, LEGACY_ID, None, {"assistant": create(CFG)}, message="rotate " + TOKEN)
+    assert pm_warnings(audit_secrets, project)[1] == [
+        f"revision {LEGACY_ID}: (message) /message openai-anthropic-key"]
+
+
+def test_allowlisted_message_is_not_stale(project):
+    write_revision(project, LEGACY_ID, None, {"assistant": create(CFG)}, message="rotate " + TOKEN)
+    write_allowlist(project, [allow_entry("(message)", "/message", "openai-anthropic-key", TOKEN)])
+    assert pm_warnings(audit_secrets, project)[1] == []

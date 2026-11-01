@@ -8,7 +8,7 @@ import warnings
 from pathlib import Path
 from .core import (
     MigrationError, audit_secrets, check, downgrade, init,
-    load_revisions, pretty, redacted_config, redacted_diff, revision, upgrade,
+    load_revisions, pretty, redacted_config, redacted_diff, redacted_history, revision, upgrade,
 )
 from .errors import PromptMigrateWarning
 
@@ -84,7 +84,8 @@ def _run(args: argparse.Namespace) -> None:
         r = revision(project, args.message)
         print(f"Created {r.revision} (parent: {r.down_revision or 'base'}): {r.path}")
     elif args.command == "history":
-        for r in load_revisions(project):
+        revisions, _redacted = redacted_history(project, load=load_revisions)
+        for r in revisions:
             print(f"{r.revision} <- {r.down_revision or 'base'} | {r.message}")
     elif args.command == "diff":
         changes, _redacted = redacted_diff(project)

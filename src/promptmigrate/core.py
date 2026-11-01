@@ -7,6 +7,7 @@ This is deliberately local-only and does not deploy to remote prompt providers.
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import os
@@ -387,6 +388,7 @@ def audit_secrets(project_dir: Path) -> None:
     used: set[secretscan.AllowEntry] = set()
     for r in revisions:
         seen: list[secretscan.Finding] = []
+        seen += [f for f in secretscan.scan("(message)", {"message": r.message}, allow, used) if f not in seen]
         for name, change in r.changes.items():
             for side in ("before", "after"):
                 if change[side] is not None:
@@ -487,3 +489,18 @@ def redacted_config(project_dir: Path, env: str, name: str) -> tuple[dict[str, A
     if paths:
         warnings.warn(_REDACTED.format(count=len(paths)), SecretRedactedWarning, stacklevel=2)
     return config, paths
+
+
+def redacted_history(project_dir: Path, load=None) -> tuple[list[Revision], list[str]]:
+    """load_revisions() for display: a secret-like message is replaced by "<redacted:RULE>"; returns the ids redacted."""
+    allow = load_allowlist(project_dir)
+    shown, redacted = [], []
+    for r in (load or load_revisions)(project_dir):
+        value, paths = secretscan.redact("(message)", {"message": r.message}, allow)
+        if paths:
+            r = dataclasses.replace(r, message=value["message"])
+            redacted.append(r.revision)
+        shown.append(r)
+    if redacted:
+        warnings.warn(_REDACTED.format(count=len(redacted)), SecretRedactedWarning, stacklevel=2)
+    return shown, redacted
