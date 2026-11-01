@@ -23,12 +23,14 @@ from typing import Any
 
 from .errors import (
     DriftError, InitializationError, IntegrityError, LegacyRevisionWarning, MigrationConflictError, MigrationError,
-    PendingRevisionsError, RevisionGraphError, SchemaError, TargetError,
+    PendingRevisionsError, RevisionGraphError, SchemaError, SecretDetectedError, SecretInHistoryWarning, TargetError,
 )
 from . import protocol
+from . import secretscan
 from .protocol import canonical, same
 
 _LEGACY = "revision {rid}: {rule} (accepted for compatibility; create a new revision to fix)"
+ALLOWLIST_FILE = "secret-allowlist.json"
 
 
 @dataclass(frozen=True)
@@ -97,6 +99,16 @@ def read_drafts(project_dir: Path) -> dict[str, dict[str, Any]]:
     if collisions:
         raise SchemaError(f"Invalid drafts: case-collision {collisions[0]}")
     return drafts
+
+
+def load_allowlist(project_dir: Path) -> list[secretscan.AllowEntry]:
+    """The reviewed secret allowlist (.promptmigrate/secret-allowlist.json); empty when the file is absent."""
+    root = require_init(project_dir)
+    path = root / ALLOWLIST_FILE
+    if not path.exists() and not path.is_symlink():
+        return []
+    value, _raw, _rules = protocol.load_json(path, kind="allowlist", root=root)
+    return secretscan.parse_allowlist(value, path.name)
 
 
 def load_revisions(project_dir: Path) -> list[Revision]:
@@ -227,6 +239,12 @@ def revision(project_dir: Path, message: str) -> Revision:
             found = protocol.config_violations(name, change["after"])
             if found:
                 raise SchemaError(f"New revision would be invalid: {', '.join(found)}")
+    allow = load_allowlist(project_dir)
+    findings = [finding for name, change in changes.items() if change["after"] is not None
+                for finding in secretscan.scan(name, change["after"], allow)]
+    findings += secretscan.scan("(message)", {"message": message.strip()}, allow)
+    if findings:
+        raise SecretDetectedError(findings)
     item = {
         "revision": rid,
         "down_revision": parent,
@@ -245,6 +263,11 @@ def revision(project_dir: Path, message: str) -> Revision:
             if carried:
                 warnings.warn(f"revision {rid}: {name} before carries {', '.join(carried)} from history "
                               "(copied for compatibility)", LegacyRevisionWarning, stacklevel=2)
+    for name, change in changes.items():
+        if change["before"] is not None:
+            for finding in secretscan.scan(name, change["before"], allow):
+                warnings.warn(f"{finding.name} {finding.path} {finding.rule} copied from history into before; "
+                              "the credential must be rotated", SecretInHistoryWarning, stacklevel=2)
     root = require_init(project_dir)
     path = root / "versions" / f"{rid}_{re.sub(r'[^a-z0-9]+', '_', message.lower()).strip('_')[:50] or 'revision'}.json"
     path.write_text(text, encoding="utf-8")
