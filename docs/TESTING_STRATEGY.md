@@ -100,7 +100,7 @@ Tests currently cover: initial revision and two environments; downgrade; checksu
 ## Suggested CI stages
 
 1. Static checks / format and type checks.
-2. Unit, graph, property-based tests.
+2. Unit, graph, property-based tests on the native OS/Python matrix and in the Linux Docker test image (`Dockerfile.ci`).
 3. SQLite integration and fault-injection tests.
 4. CLI documentation examples as executable smoke tests.
 5. Build/package install tests on Linux, macOS, Windows (when supported).

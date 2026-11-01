@@ -121,6 +121,17 @@ project/
 
 ## CI example
 
+GitHub Actions runs the test suite on its native OS/Python matrix and in a
+Linux Python 3.12 Docker container. To run the same container check locally:
+
+```bash
+docker build -f Dockerfile.ci -t promptmigrate-ci .
+docker run --rm promptmigrate-ci
+```
+
+The Docker job supplements the native matrix; it does not replace Windows or
+macOS coverage.
+
 ```yaml
 - run: python -m pip install -e .
 - run: python -m unittest discover -s tests -v
