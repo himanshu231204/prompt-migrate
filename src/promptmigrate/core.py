@@ -328,7 +328,7 @@ def _verify(db: sqlite3.Connection, revisions: list[Revision]) -> int:
     expected = replay_revisions(revisions[:len(applied)])
     try:
         actual = _actual(db)
-    except (sqlite3.Error, ValueError, TypeError) as exc:
+    except (sqlite3.Error, ValueError, TypeError, RecursionError) as exc:
         raise StorageError("Corrupt environment state") from exc
     names = sorted(name for name in actual.keys() | expected.keys()
                    if not same(actual.get(name), expected.get(name)))

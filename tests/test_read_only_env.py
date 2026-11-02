@@ -94,7 +94,7 @@ def test_missing_required_table_is_storage_error_without_repair(project, capsys,
     assert snapshot(project) == before
 
 
-@pytest.mark.parametrize("corruption", ["applied_columns", "invalid_json", "null_config"])
+@pytest.mark.parametrize("corruption", ["applied_columns", "invalid_json", "null_config", "deep_json"])
 @pytest.mark.parametrize("command", ["check", "current", "get"])
 def test_corrupt_state_reads_are_storage_errors_without_repair(project, capsys, corruption, command):
     manifest(project, {"dev": {}})
@@ -108,6 +108,9 @@ def test_corrupt_state_reads_are_storage_errors_without_repair(project, capsys, 
             db.execute("DROP TABLE old_applied_revisions")
         elif corruption == "invalid_json":
             db.execute("UPDATE prompts SET config='not-json' WHERE name='assistant'")
+        elif corruption == "deep_json":
+            deeply_nested = "[" * 1100 + "0" + "]" * 1100
+            db.execute("UPDATE prompts SET config=? WHERE name='assistant'", (deeply_nested,))
         else:
             db.execute("DROP TABLE prompts")
             db.execute("CREATE TABLE prompts (name TEXT PRIMARY KEY, config TEXT)")
