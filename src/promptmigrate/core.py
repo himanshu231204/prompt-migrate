@@ -55,14 +55,11 @@ def _hash(data: bytes) -> str:
 
 
 def root_dir(project_dir: Path) -> Path:
-    return Path(project_dir).resolve() / ".promptmigrate"
+    return store.root_dir(project_dir)
 
 
 def require_init(project_dir: Path) -> Path:
-    root = root_dir(project_dir)
-    if not (root / "versions").is_dir() or not (root / "drafts").is_dir():
-        raise InitializationError("Not initialized. Run: promptmigrate init")
-    return root
+    return store.require_init(project_dir)
 
 
 def init(project_dir: Path) -> Path:
@@ -378,7 +375,7 @@ def audit_secrets(project_dir: Path) -> None:
 
 
 def upgrade(project_dir: Path, env: str, target: str = "head") -> list[str]:
-    env = store.resolve_environment(project_dir, env, mutating=True)
+    env = store.resolve_environment(project_dir, env)
     revisions = load_revisions(project_dir)
     targets = [r.revision for r in revisions]
     if target != "head" and target not in targets:
@@ -406,11 +403,12 @@ def upgrade(project_dir: Path, env: str, target: str = "head") -> list[str]:
                 "INSERT INTO applied_revisions(revision, checksum, applied_at) VALUES(?, ?, ?)",
                 (r.revision, r.checksum, datetime.now(timezone.utc).isoformat()),
             )
+    store.adopt_environments(project_dir)
     return targets[applied_count:target_count]
 
 
 def downgrade(project_dir: Path, env: str, target: str = "-1") -> list[str]:
-    env = store.resolve_environment(project_dir, env, mutating=True)
+    env = store.resolve_environment(project_dir, env)
     revisions = load_revisions(project_dir)
     targets = [r.revision for r in revisions]
     with store.connect_write(project_dir, env) as db:
@@ -441,6 +439,7 @@ def downgrade(project_dir: Path, env: str, target: str = "-1") -> list[str]:
                         (name, canonical(before)),
                     )
             db.execute("DELETE FROM applied_revisions WHERE revision=?", (r.revision,))
+    store.adopt_environments(project_dir)
     return [r.revision for r in reversed_revisions]
 
 

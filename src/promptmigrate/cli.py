@@ -82,12 +82,6 @@ def _print_warnings(caught: list[warnings.WarningMessage]) -> None:
             print(f"Warning: {w.message}", file=sys.stderr)
 
 
-def _environment_label(project: Path, env: str) -> str:
-    store._validate_name(env)
-    environments, _existed = store.read_environments(project)
-    return next((name for name in environments if name.lower() == env.lower()), env)
-
-
 def _run(args: argparse.Namespace) -> None:
     project = Path(args.project)
     if args.command == "init":
@@ -103,20 +97,20 @@ def _run(args: argparse.Namespace) -> None:
         changes, _redacted = redacted_diff(project)
         print(pretty(changes))
     elif args.command == "current":
-        label = _environment_label(project, args.env)
+        label = store.display_name(project, args.env)
         n, total = check(project, args.env)
         revisions = load_revisions(project)
         print(f"{label}: {revisions[n-1].revision if n else 'base'} ({n}/{total} applied)")
     elif args.command == "upgrade":
-        label = _environment_label(project, args.env)
+        label = store.display_name(project, args.env)
         ids = upgrade(project, args.env, args.target)
         print(f"{label}: applied {len(ids)} revision(s): {', '.join(ids) or '(already current)'}")
     elif args.command == "downgrade":
-        label = _environment_label(project, args.env)
+        label = store.display_name(project, args.env)
         ids = downgrade(project, args.env, args.target)
         print(f"{label}: reverted {len(ids)} revision(s): {', '.join(ids) or '(nothing to revert)'}")
     elif args.command == "check":
-        label = _environment_label(project, args.env)
+        label = store.display_name(project, args.env)
         audit_secrets(project)
         n, total = check(project, args.env, args.require_head)
         print(f"OK: {label} is consistent ({n}/{total} revisions applied)")

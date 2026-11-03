@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import re
 import sqlite3
+import stat
 import tempfile
 from typing import Any
 from urllib.parse import quote
@@ -25,15 +26,24 @@ from .errors import (
 )
 
 
+_NAME = re.compile(r"[A-Za-z][A-Za-z0-9_-]{0,63}")
+DEFAULT_ENVIRONMENTS = ("dev", "staging")
+
+
 def _validate_name(name: str) -> None:
-    if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{0,63}", name):
+    if not isinstance(name, str) or not _NAME.fullmatch(name):
         raise SchemaError("Environment must be alphanumeric, starting with a letter")
     if re.fullmatch(r"(?i:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])", name):
         raise SchemaError("Environment name is reserved on Windows")
 
 
-def _root(project_dir: Path) -> Path:
-    root = Path(project_dir).resolve() / ".promptmigrate"
+def root_dir(project_dir: Path) -> Path:
+    return Path(project_dir).resolve() / ".promptmigrate"
+
+
+def require_init(project_dir: Path) -> Path:
+    """Return the .promptmigrate directory, or raise InitializationError if the project is not initialized."""
+    root = root_dir(project_dir)
     if not (root / "versions").is_dir() or not (root / "drafts").is_dir():
         raise InitializationError("Not initialized. Run: promptmigrate init")
     return root
@@ -51,7 +61,7 @@ def _is_linklike(path: Path) -> bool:
 
 
 def _states_dir(project_dir: Path) -> Path:
-    path = _root(project_dir) / "states"
+    path = require_init(project_dir) / "states"
     if _is_linklike(path):
         raise StorageError("Invalid environment state: states directory is a symbolic link or junction")
     if path.exists() and not path.is_dir():
@@ -77,7 +87,7 @@ def _wal_mode(path: Path) -> bool:
 
 def read_environments(project_dir: Path) -> tuple[dict[str, dict[str, Any]], bool]:
     """Read declarations, or infer legacy declarations without writing any files."""
-    root = _root(project_dir)
+    root = require_init(project_dir)
     path = root / "environments.json"
     if path.exists() or path.is_symlink():
         value, _raw, _rules = protocol.load_json(path, kind="environments", root=root)
@@ -86,8 +96,7 @@ def read_environments(project_dir: Path) -> tuple[dict[str, dict[str, Any]], boo
         environments = value["environments"]
         existed = True
     else:
-        states = sorted((p for p in _states_dir(project_dir).glob("*.sqlite3") if p.is_file()), key=lambda p: p.stem.lower())
-        environments = {p.stem: {} for p in states} if states else {"dev": {}, "staging": {}}
+        environments = _infer_environments(project_dir)
         existed = False
     for name, metadata in environments.items():
         _validate_name(name)
@@ -101,17 +110,55 @@ def read_environments(project_dir: Path) -> tuple[dict[str, dict[str, Any]], boo
     return environments, existed
 
 
+def _infer_environments(project_dir: Path) -> dict[str, dict[str, Any]]:
+    """Legacy declarations: the defaults plus every state file a pre-manifest release could have created.
+
+    Those releases validated names with the same syntax, so a stem that fails it was never PromptMigrate state and is
+    ignored. Reserved and case-colliding stems stay in and fail closed later, because they may be real state.
+    """
+    stems = [p.stem for p in _states_dir(project_dir).glob("*.sqlite3") if p.is_file() and _NAME.fullmatch(p.stem)]
+    taken = {stem.lower() for stem in stems}
+    names = stems + [name for name in DEFAULT_ENVIRONMENTS if name not in taken]
+    return {name: {} for name in sorted(names, key=str.lower)}
+
+
+def canonical_name(environments: dict[str, Any], env: str) -> str | None:
+    """Return the declared spelling that matches env case-insensitively, or None."""
+    lowered = env.lower()
+    return next((name for name in environments if name.lower() == lowered), None)
+
+
+def display_name(project_dir: Path, env: str) -> str:
+    """Return env's declared spelling for status labels, or env unchanged when it is not declared."""
+    _validate_name(env)
+    environments, _existed = read_environments(project_dir)
+    return canonical_name(environments, env) or env
+
+
+def _new_file_mode(path: Path) -> int:
+    """Keep an existing file's permission bits; give a new file the usual umask-derived mode."""
+    try:
+        return stat.S_IMODE(path.stat().st_mode)
+    except FileNotFoundError:
+        umask = os.umask(0)
+        os.umask(umask)
+        return 0o666 & ~umask
+
+
 def _write_environments(project_dir: Path, environments: dict[str, dict[str, Any]]) -> Path:
-    path = _root(project_dir) / "environments.json"
+    path = require_init(project_dir) / "environments.json"
     text = json.dumps({"environments": environments}, ensure_ascii=False, indent=2) + "\n"
     if len(text.encode("utf-8")) > protocol.MAX_CONTROL_FILE_BYTES:
         raise SchemaError(f"Invalid environments file: output exceeds the {protocol.MAX_CONTROL_FILE_BYTES}-byte limit")
+    mode = _new_file_mode(path)
     temporary = None
     try:
         with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", newline="\n", dir=path.parent,
                                          prefix=".environments-", suffix=".tmp", delete=False) as file:
             temporary = Path(file.name)
             file.write(text)
+        # NamedTemporaryFile creates 0600 files; a tracked manifest must stay readable like any other source file.
+        os.chmod(temporary, mode)
         os.replace(temporary, path)
     finally:
         if temporary is not None:
@@ -122,7 +169,7 @@ def _write_environments(project_dir: Path, environments: dict[str, dict[str, Any
 @contextmanager
 def _project_lock(project_dir: Path) -> Iterator[None]:
     """Serialize project metadata changes and initial environment database setup."""
-    root = _root(project_dir)
+    root = require_init(project_dir)
     if os.name == "nt":
         import ctypes
         digest = hashlib.sha256(os.fsencode(root)).hexdigest()
@@ -169,24 +216,38 @@ def _warn_production(name: str) -> None:
 
 
 def resolve_environment(project_dir: Path, env: str, *, mutating: bool = False) -> str:
-    """Resolve case-insensitively, persisting legacy declarations only on mutation."""
+    """Resolve case-insensitively; with mutating=True, also persist inferred legacy declarations."""
     _validate_name(env)
     if mutating:
         with _project_lock(project_dir):
-            environments, existed = read_environments(project_dir)
-            name = next((name for name in environments if name.lower() == env.lower()), None)
-            if name is None:
-                raise EnvironmentNotDeclaredError(env)
-            if not existed:
-                _write_environments(project_dir, environments)
-                _warn_adoption()
+            name = _resolve_declared(project_dir, env, adopt=True)
     else:
-        environments, _existed = read_environments(project_dir)
-        name = next((name for name in environments if name.lower() == env.lower()), None)
-        if name is None:
-            raise EnvironmentNotDeclaredError(env)
+        name = _resolve_declared(project_dir, env, adopt=False)
     _warn_production(name)
     return name
+
+
+def _resolve_declared(project_dir: Path, env: str, *, adopt: bool) -> str:
+    environments, existed = read_environments(project_dir)
+    name = canonical_name(environments, env)
+    if name is None:
+        raise EnvironmentNotDeclaredError(env)
+    if adopt and not existed:
+        _write_environments(project_dir, environments)
+        _warn_adoption()
+    return name
+
+
+def adopt_environments(project_dir: Path) -> None:
+    """Persist inferred legacy declarations once; a no-op when the manifest already exists.
+
+    Migration commands call this only after their transaction commits, so a rejected command writes nothing.
+    """
+    with _project_lock(project_dir):
+        environments, existed = read_environments(project_dir)
+        if not existed:
+            _write_environments(project_dir, environments)
+            _warn_adoption()
 
 
 def add_environment(project_dir: Path, name: str) -> Path:
@@ -194,7 +255,7 @@ def add_environment(project_dir: Path, name: str) -> Path:
     _validate_name(name)
     with _project_lock(project_dir):
         environments, existed = read_environments(project_dir)
-        if any(existing.lower() == name.lower() for existing in environments):
+        if canonical_name(environments, name) is not None:
             raise SchemaError(f"Environment {name!r} is already declared")
         environments[name] = {}
         path = _write_environments(project_dir, environments)
@@ -240,6 +301,9 @@ def connect_readonly(project_dir: Path, env: str) -> Iterator[sqlite3.Connection
             if _wal_mode(path):
                 raise StorageError(f"Invalid environment state {env!r}: WAL journal mode is unsupported for read-only inspection")
             connection = sqlite3.connect(_sqlite_uri(path), uri=True, timeout=10)
+            # One read transaction for the whole inspection: the ledger and prompts must come from the same snapshot,
+            # or a concurrent upgrade committing between the two reads would look like drift.
+            connection.execute("BEGIN")
             tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             if not {"applied_revisions", "prompts"} <= tables:
                 raise StorageError(f"Invalid environment state {env!r}: missing required tables")
