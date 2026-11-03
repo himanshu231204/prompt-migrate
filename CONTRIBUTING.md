@@ -12,11 +12,14 @@ Python 3.10 or newer. The runtime uses only the standard library; the dev extras
 
 ```bash
 python -m venv .venv
-.venv/bin/python -m pip install -e ".[dev]"      # Windows: .venv\Scripts\python
+source .venv/bin/activate                        # Windows PowerShell: .venv\Scripts\Activate.ps1
+python -m pip install -e ".[dev]"
 python -m pytest -q                              # the whole suite
-PYTHONPATH=src python -m unittest discover -s tests -v   # the original seven tests still pass under unittest
-python -m promptmigrate --project /tmp/demo init # the CLI from source
+PYTHONPATH=src python -m unittest discover -s tests -v   # the original seven tests (PowerShell: $env:PYTHONPATH='src')
+python -m promptmigrate --project /tmp/demo init # the CLI
 ```
+
+Every command after the activation runs in the virtual environment. Activate it again in each new shell.
 
 ## How work is done here
 
