@@ -3,7 +3,7 @@ import sqlite3
 
 import pytest
 
-from promptmigrate import core
+from promptmigrate import apply, core
 from promptmigrate.core import MigrationError, check, downgrade, get_config, init, revision, upgrade
 
 
@@ -26,7 +26,7 @@ def opened(project, monkeypatch):
         connections.append(connection)
         return connection
 
-    monkeypatch.setattr(core.sqlite3, "connect", tracking_connect)
+    monkeypatch.setattr(sqlite3, "connect", tracking_connect)
     return connections
 
 
@@ -78,7 +78,7 @@ def test_failed_upgrade_rolls_back_every_write(tmp_path, monkeypatch):
     draft.write_text('{"messages": [{"role": "system", "content": "two"}]}', encoding="utf-8")
     revision(tmp_path, "two")
 
-    real_canonical = core.canonical
+    real_canonical = apply.canonical
     calls = []
 
     def fail_on_second_write(obj):
@@ -87,7 +87,7 @@ def test_failed_upgrade_rolls_back_every_write(tmp_path, monkeypatch):
             raise RuntimeError("injected write failure")
         return real_canonical(obj)
 
-    monkeypatch.setattr(core, "canonical", fail_on_second_write)
+    monkeypatch.setattr(apply, "canonical", fail_on_second_write)
     with pytest.raises(RuntimeError, match="injected write failure"):
         upgrade(tmp_path, "dev")
     monkeypatch.undo()

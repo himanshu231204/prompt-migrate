@@ -1,28 +1,28 @@
 # LOW-LEVEL DESIGN (LLD) — Core Python migration engine
 
-## 1. Baseline versus target modules
+## 1. Module layout
 
-The existing starter is monolithic (`core.py`, `cli.py`). The following **target module layout** is a refactor proposal, not evidence these files exist:
+Implemented (ADR-022). Each concept has one module; imports point down this order, and `tests/unit/test_module_layout.py`
+enforces it:
 
 ```text
 src/promptmigrate/
-  cli.py
-  config/loader.py
-  config/schema.py
-  revisions/model.py
-  revisions/graph.py
-  revisions/generator.py
-  revisions/diff.py
-  migration/planner.py
-  migration/executor.py
-  migration/rollback.py
-  state/sqlite.py
-  state/models.py
-  validation/integrity.py
-  validation/drift.py
-  reporting/formatters.py
-  adapters/base.py                # interface placeholder only
+  errors.py          error and warning types                                     layer 0
+  protocol/          limits, jsonloader (strict JSON), equality, rules           layer 1
+  secretscan.py      heuristic secret rules, allowlist parsing, redaction        layer 2
+  project.py         .promptmigrate/ layout, drafts, secret allowlist            layer 3
+  revisions.py       Revision, load_revisions (parse + graph), replay            layer 4
+  store/             environments (manifest, adoption), lock, sqlite (ro/rw)     layer 4
+  draftdiff.py       drafts vs replayed source head, redacted diff               layer 5
+  apply.py           verify ledger/rows against history; write revisions         layer 5
+  commands/          one module per CLI verb: use-case function + run(args)      layer 6
+  cli.py             argparse, dispatch, warning capture, error printing         layer 7
+  core.py            public facade: re-exports only
 ```
+
+Reserved for upcoming work: `plan.py` (PR 5, pure target resolution, used by `commands/upgrade.py` and
+`commands/downgrade.py`) and `output.py` (PR 6, text/JSON rendering and exit codes). Later phases add their own
+modules (evaluation gates, release activation, provider adapters) instead of growing existing ones.
 
 Keep the public command behavior stable during refactor. Refactor in tested increments rather than recreating implementation from scratch.
 

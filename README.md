@@ -55,6 +55,8 @@ promptmigrate downgrade -1 --env staging
 
 A revision describes the change from the previous Git-tracked version, **not the state of your local dev database**. Generate a revision only after integrating the latest revisions from your team. For multi-agent systems, add more named files under `.promptmigrate/drafts/`, e.g. `planner.json`, `sql_agent.json`, or `reviewer.json`. Deleting a draft and creating a revision explicitly deletes the prompt in a target environment, with reversible history.
 
+A runnable two-agent walkthrough (init → revision → upgrade → check → downgrade) is in [`examples/multi-agent-basic/`](examples/multi-agent-basic/).
+
 ## Example declarative migration
 
 The tool generates a JSON revision like this (abbreviated):
@@ -144,10 +146,12 @@ For a real production rollout the future release pipeline must additionally run 
 ## Tests
 
 ```bash
-python -m unittest discover -s tests -v
+python -m pip install -e ".[dev]"
+python -m pytest -q                                      # whole suite: tests/{unit,integration,contract,security}
+PYTHONPATH=src python -m unittest discover -s tests -v   # the original seven starter tests
 ```
 
-Tests cover revision generation, history, separate environment revisions, deterministic rollback, deletion, drift detection, tampered migration files, multiple prompt migrations, and invalid environment paths.
+Tests cover revision generation, history, separate environment revisions, deterministic rollback, deletion, drift detection, tampered migration files, multiple prompt migrations, strict parsing, declared environments, read-only reads and the secret safeguard. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for how to contribute and where each part of the code lives.
 
 ## Safety and integrity guarantees in v0.1
 

@@ -21,12 +21,27 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 | 2026-10-31 (after PR 3) | Windows 11, Python 3.11.9 | `python -m pytest -q` → `147 passed, 7 skipped, 2 xfailed` |
 | 2026-11-01 (after PR 3b) | Windows 11, Python 3.11.9 | `python -m pytest -q` → `262 passed, 8 skipped, 2 xfailed` |
 | 2026-11-01 (after PR 4) | Windows 11, Python 3.11.9 | `.venv/Scripts/python -m pytest -q -rxXs` → `469 passed, 16 skipped, 33 warnings`; original unittest suite → `Ran 7 tests ... OK` |
+| 2026-11-03 (after the package layout refactor, suite directories and multi-agent example) | Windows 11, Python 3.11.9 | `python -m pytest -q` → `620 passed, 18 skipped, 33 warnings`; original unittest suite → `Ran 7 tests ... OK` |
 
 GitHub Actions runs the complete suite inside Linux Docker containers, and natively on `windows-latest` and
 `macos-latest`, for Python 3.10, 3.12 and 3.13. The native jobs cover the store's Windows-only paths and macOS's
 case-insensitive filesystem. Python 3.11 remains covered by the local Windows merge gate (`AGENTS.md`).
 
 Tests currently cover: initial revision and two environments; downgrade; checksum tampering; local drift; bad before-state preconditions; deletion/recovery; invalid environment name; no-op revision; multi-prompt revision/rollback. Phase 1 cycle 1 PR 2 added characterization tests (revision-graph errors, upgrade/downgrade targets, CLI text output and exit codes, the README example), five strict xfails for known bugs, and eight legacy-history compatibility fixtures. PR 3 added error-type, strict-parsing, canonical-equality, new-content, legacy-warning and CLI-warning tests, and removed three of the five xfails. PR 3b added secret-rule unit tests (built from runtime fragments, never literals), revision blocking, output redaction, history and stale-allowlist warnings. PR 4 adds declared-environment schema/adoption, canonical resolution, atomic manifest replacement, read-only SQLite contracts, malformed/missing storage, connection lifecycle, concurrent manifest and initial DB setup, and CLI output/warning coverage. Windows symlink and case-collision paths skip on this host and remain unverified here. This is **proof of a local prototype**, not extensive production verification.
+
+## Where tests live
+
+| Directory | Suite |
+|---|---|
+| `tests/test_core.py` | the original seven starter tests; kept at the root so `unittest discover -s tests` still finds them |
+| `tests/unit/` | A — parser, graph, strict loader, equality, content rules, errors, legacy compatibility, known bugs, module layout |
+| `tests/property/` | B — `hypothesis` state-machine tests (created by PR 5) |
+| `tests/integration/` | C — SQLite lifecycle, environment store, locking, declared environments |
+| `tests/contract/` | D — CLI exit codes, stdout/stderr, warnings, reads never write |
+| `tests/security/` | E — secret scanner, redaction, allowlist, revision blocking |
+
+Shared helpers live in `tests/pmtest.py` and fixtures in `tests/fixtures/`. Test modules never import each other.
+Basenames stay unique across directories, because pytest's default `prepend` import mode needs that.
 
 ## Required suites
 

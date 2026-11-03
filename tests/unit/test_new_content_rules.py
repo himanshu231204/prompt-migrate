@@ -63,7 +63,7 @@ def test_case_colliding_draft_names_rejected(project):
 
 
 def test_revision_over_size_limit_refused_before_writing(project, monkeypatch):
-    monkeypatch.setattr(protocol, "MAX_REVISION_BYTES", 100)
+    monkeypatch.setattr(protocol.limits, "MAX_REVISION_BYTES", 100)
     with pytest.raises(SchemaError, match=r"New revision would be \d+ bytes; the limit is 100"):
         revision(project, "initial")
     assert versions(project) == []
@@ -78,19 +78,19 @@ def test_revision_size_limit_checked_against_real_file_size(project, monkeypatch
 
     # isoformat() drops the 7-character microseconds part when microseconds is 0, so the real size can
     # vary by up to 7 bytes between runs; the 8-byte margin below absorbs that.
-    monkeypatch.setattr(protocol, "MAX_REVISION_BYTES", size - 8)
+    monkeypatch.setattr(protocol.limits, "MAX_REVISION_BYTES", size - 8)
     with pytest.raises(SchemaError, match=r"New revision would be \d+ bytes; the limit is"):
         revision(project, "initial")
     assert versions(project) == []
 
-    monkeypatch.setattr(protocol, "MAX_REVISION_BYTES", size + 50)
+    monkeypatch.setattr(protocol.limits, "MAX_REVISION_BYTES", size + 50)
     revision(project, "initial")
     assert pm_warnings(load_revisions, project)[1] == []
 
 
 def test_revision_rechecks_after_values(project, monkeypatch):
     """I15 defence in depth: even with draft validation bypassed, revision() refuses an invalid new after."""
-    monkeypatch.setattr(core, "read_drafts", lambda project_dir: {"assistant": {"model": 1}})
+    monkeypatch.setattr("promptmigrate.project.read_drafts", lambda project_dir: {"assistant": {"model": 1}})
     message = "New revision would be invalid: reserved-field-type assistant.model"
     with pytest.raises(SchemaError, match=re.escape(message)):
         revision(project, "bypass")

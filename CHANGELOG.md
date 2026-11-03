@@ -4,6 +4,27 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
 
 ## Unreleased
 
+### Community files
+
+- Added `examples/multi-agent-basic/`: two agent drafts and a cross-platform `run.py` that walks the full lifecycle.
+  `tests/contract/test_examples.py` runs it on every test run.
+- Added `CONTRIBUTING.md` (setup, rules, a "where does X live" table), `CODE_OF_CONDUCT.md` (Contributor
+  Covenant 2.1), a root `SECURITY.md` (private reporting through GitHub), and issue and pull request templates.
+
+### Phase 1 cycle 1 — package layout refactor
+
+- `promptmigrate.protocol` is now a package: `limits`, `jsonloader`, `equality` and `rules`. It re-exports every
+  previous name. Limits are read at call time from `protocol.limits`, so tests patch them there.
+- `promptmigrate.store` is now a package: `environments`, `lock` and `sqlite`. It re-exports every previous name.
+  `root_dir`/`require_init` live in the new `promptmigrate.project`. Environment-name syntax moved to
+  `protocol.rules.validate_environment_name`.
+- `core.py` is now a re-export facade (ADR-022). Logic lives in `project`, `revisions`, `draftdiff`, `apply` and
+  one `commands.<verb>` module per CLI verb; `cli.py` only parses and dispatches. `promptmigrate.__all__` exposes the
+  same public names as `core`. Monkeypatching `core` or `cli` no longer changes behaviour; patch the defining module.
+- Tests are grouped by suite in `tests/{unit,integration,contract,security}/`. The original `test_core.py` stays at
+  the root. Helpers that one test module imported from another moved to `tests/pmtest.py`.
+- No CLI, file-format or checksum change: CLI output is byte-identical to the previous release.
+
 ### Phase 1 cycle 1 — PR 4: declared environments and read-only state reads
 
 - **Contract:** `init` declares `dev` and `staging` in `.promptmigrate/environments.json`. `env add <name>` adds a declaration atomically; `env list` reports each declared name and whether its local SQLite file exists.

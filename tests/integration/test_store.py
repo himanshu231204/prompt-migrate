@@ -11,10 +11,8 @@ import warnings
 
 import pytest
 
-from pmtest import nested_config, pm_dir, symlink_or_skip
+from pmtest import SYNTAX_MESSAGE, manifest, nested_config, pm_dir, snapshot, store_api, symlink_or_skip
 from promptmigrate import errors, protocol
-from test_environments import manifest, store_api, SYNTAX_MESSAGE
-from test_read_only_env import snapshot
 
 
 @pytest.mark.parametrize("value", [
@@ -266,8 +264,8 @@ def test_store_concurrent_additions_preserve_both_declarations(project, monkeypa
         first_read.wait(1)
         return original_write(*args, **kwargs)
 
-    monkeypatch.setattr(api, "read_environments", read)
-    monkeypatch.setattr(api, "_write_environments", write)
+    monkeypatch.setattr(api.environments, "read_environments", read)
+    monkeypatch.setattr(api.environments, "_write_environments", write)
     failures = []
 
     def add(name):
@@ -601,7 +599,7 @@ def test_store_second_writer_waits_for_first_schema_initialization(project, monk
         with original_lock(project_dir):
             yield
 
-    monkeypatch.setattr(api, "_project_lock", observe_second_lock)
+    monkeypatch.setattr(api.lock, "_project_lock", observe_second_lock)
 
     class PausedConnection(sqlite3.Connection):
         def execute(self, sql, *args):

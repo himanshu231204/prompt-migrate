@@ -1,6 +1,4 @@
 """PR 4 contract: declared environments, adoption, strict parsing and CLI."""
-import importlib
-import importlib.util
 import json
 import os
 import sqlite3
@@ -10,43 +8,16 @@ from pathlib import Path
 
 import pytest
 
-from pmtest import nested_config, pm_dir, set_draft, symlink_or_skip, tree_snapshot
-from promptmigrate import cli, core, errors, protocol
-
-
-SYNTAX_MESSAGE = "Environment must be alphanumeric, starting with a letter"
-
-
-def manifest(project, environments):
-    path = pm_dir(project) / "environments.json"
-    path.write_text(json.dumps({"environments": environments}), encoding="utf-8")
-    return path
-
-
-def store_api():
-    # Assert absent PR4 interfaces at call time: collection must stay usable.
-    assert importlib.util.find_spec("promptmigrate.store") is not None, "PR4 environment store is missing"
-    return importlib.import_module("promptmigrate.store")
-
-
-def error_type(name):
-    assert hasattr(errors, name), f"PR4 error/warning type {name} is missing"
-    return getattr(errors, name)
+from pmtest import (
+    SYNTAX_MESSAGE, error_type, manifest, nested_config, pm_dir, run_cli, set_draft, store_api, symlink_or_skip,
+    tree_snapshot,
+)
+from promptmigrate import apply, cli, core, errors, protocol
 
 
 def core_api(name):
     assert hasattr(core, name), f"PR4 core API {name} is missing"
     return getattr(core, name)
-
-
-def run_cli(capsys, project, *argv):
-    try:
-        code = cli.main(["--project", str(project), *argv])
-    except SystemExit as exc:
-        out, err = capsys.readouterr()
-        pytest.fail(f"PR4 CLI command was rejected (exit {exc.code}): {err}")
-    out, err = capsys.readouterr()
-    return code, out, err
 
 
 def test_init_declares_exact_defaults(project):
@@ -476,13 +447,13 @@ def test_read_only_verification_uses_one_snapshot(project, monkeypatch, command)
     core.upgrade(project, "dev")
     seen = []
     for name in ("_applied", "_actual"):
-        real = getattr(core, name)
+        real = getattr(apply, name)
 
         def tracked(db, _real=real, _name=name):
             seen.append((_name, db.in_transaction))
             return _real(db)
 
-        monkeypatch.setattr(core, name, tracked)
+        monkeypatch.setattr(apply, name, tracked)
     if command == "check":
         core.check(project, "dev")
     else:
