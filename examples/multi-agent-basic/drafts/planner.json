@@ -1,0 +1,28 @@
+{
+  "messages": [
+    {
+      "content": "You are the planner. Break the user's request into at most five research questions and hand each one to the researcher.",
+      "role": "system"
+    }
+  ],
+  "model": "provider/model-id",
+  "parameters": {
+    "temperature": 0
+  },
+  "response_schema": {
+    "properties": {
+      "questions": {
+        "items": {
+          "type": "string"
+        },
+        "maxItems": 5,
+        "type": "array"
+      }
+    },
+    "required": [
+      "questions"
+    ],
+    "type": "object"
+  },
+  "tools": []
+}

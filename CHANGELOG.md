@@ -6,6 +6,8 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
 
 ### Community files
 
+- Added `examples/multi-agent-basic/`: two agent drafts and a cross-platform `run.py` that walks the full lifecycle.
+  `tests/contract/test_examples.py` runs it on every test run.
 - Added `CONTRIBUTING.md` (setup, rules, a "where does X live" table), `CODE_OF_CONDUCT.md` (Contributor
   Covenant 2.1), a root `SECURITY.md` (private reporting through GitHub), and issue and pull request templates.
 

@@ -55,6 +55,8 @@ promptmigrate downgrade -1 --env staging
 
 A revision describes the change from the previous Git-tracked version, **not the state of your local dev database**. Generate a revision only after integrating the latest revisions from your team. For multi-agent systems, add more named files under `.promptmigrate/drafts/`, e.g. `planner.json`, `sql_agent.json`, or `reviewer.json`. Deleting a draft and creating a revision explicitly deletes the prompt in a target environment, with reversible history.
 
+A runnable two-agent walkthrough (init → revision → upgrade → check → downgrade) is in [`examples/multi-agent-basic/`](examples/multi-agent-basic/).
+
 ## Example declarative migration
 
 The tool generates a JSON revision like this (abbreviated):
