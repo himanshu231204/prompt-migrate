@@ -21,6 +21,7 @@ _PREFIX = {
     "draft": "Invalid JSON draft",
     "revision": "Unreadable migration",
     "allowlist": "Invalid secret allowlist",
+    "environments": "Invalid environments file",
 }
 
 
@@ -58,10 +59,11 @@ def _finite_float(text: str) -> float:
 
 
 def load_json(path: Path, *, kind: str, root: Path) -> tuple[Any, bytes, list[str]]:
-    """Strictly read one source file of kind "draft", "revision" or "allowlist" under root (.promptmigrate/).
+    """Strictly read one source file under root (.promptmigrate/).
 
-    Returns (value, raw bytes, tier-B file rules). Tier-A problems always raise SchemaError. Drafts and the allowlist
-    also raise on symlinks and size; an existing revision returns those rules so that the caller can warn.
+    Returns (value, raw bytes, tier-B file rules). Tier-A problems always raise SchemaError. Drafts, the allowlist,
+    and the environment manifest raise on symlinks and size; an existing revision returns those rules so that the
+    caller can warn.
     """
     prefix = _PREFIX[kind]
     rules: list[str] = []
@@ -71,11 +73,15 @@ def load_json(path: Path, *, kind: str, root: Path) -> tuple[Any, bytes, list[st
         if path.is_symlink():
             if kind == "draft":
                 raise SchemaError(f"{prefix} {path.name}: drafts must not be symlinks")
-            if kind == "allowlist":
+            if kind in {"allowlist", "environments"}:
                 raise SchemaError(f"{prefix} {path.name}: must not be a symlink")
             rules.append("symlink")
         size = path.stat().st_size
-        limit = {"draft": MAX_DRAFT_BYTES, "allowlist": MAX_CONTROL_FILE_BYTES}.get(kind)
+        limit = {
+            "draft": MAX_DRAFT_BYTES,
+            "allowlist": MAX_CONTROL_FILE_BYTES,
+            "environments": MAX_CONTROL_FILE_BYTES,
+        }.get(kind)
         if limit is not None and size > limit:
             raise SchemaError(f"{prefix} {path.name}: {size} bytes exceeds the {limit}-byte limit")
         raw = path.read_bytes()
@@ -89,7 +95,7 @@ def load_json(path: Path, *, kind: str, root: Path) -> tuple[Any, bytes, list[st
     if kind == "revision" and len(raw) > MAX_REVISION_BYTES:
         rules.append("revision-size")
     try:
-        # Drafts and the allowlist are decoded as UTF-8 text, so a BOM is rejected; revisions are parsed from bytes,
+        # Drafts and control files are decoded as UTF-8 text, so a BOM is rejected; revisions are parsed from bytes,
         # so a BOM is accepted. Both are unchanged from the starter (spec §3). A UnicodeDecodeError is a ValueError.
         document = raw if kind == "revision" else raw.decode("utf-8")
         value = json.loads(

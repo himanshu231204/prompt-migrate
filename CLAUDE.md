@@ -10,10 +10,10 @@ Workflow, TDD rules, hard rules and the review report format are in [`AGENTS.md`
 
 ## Status
 
-- Implemented: `init`, `revision`, `history`, `diff`, `current`, `upgrade`, `downgrade`, `check`, `get`.
+- Implemented: `init`, `revision`, `history`, `diff`, `current`, `upgrade`, `downgrade`, `check`, `get`, `env add`, `env list`.
 - Current scope: Phase 1, cycle 1, in `docs/ROADMAP.md`.
 - `docs/` also describes future modules and commands (`plan`, `eval`, `export`, Postgres, SDK, …). They don't exist yet.
-- Test baseline: all tests pass on Windows 11 / Python 3.11.9 after Phase 1 cycle 1 PR 3b (2 strict xfails remain for PR 4). Linux/macOS are claimed only once CI runs on a remote.
+- Test baseline: after PR 4, Windows 11 / Python 3.11.9 reports `469 passed, 16 skipped, 33 warnings`; the original seven unittest tests pass. Skips include symlink and case-collision cases unavailable on this host. Linux/macOS are claimed only after a remote CI run.
 
 ## Commands
 
@@ -34,13 +34,14 @@ PYTHONPATH=src python -m promptmigrate --project <dir> history   # CLI from sour
 
 ## Architecture
 
-Logic is in `src/promptmigrate/core.py` (commands, revision parsing, graph, replay, SQLite), `protocol.py` (strict JSON loading, limits, config validation, `canonical`/`same`), `secretscan.py` (heuristic secret rules, fingerprinted allowlist, redaction; no I/O) and `errors.py` (error and warning types). `cli.py` is a thin argparse dispatcher: it prints any `MigrationError`, `OSError` or `sqlite3.Error` as `Error: …` on stderr and exits 1. It prints captured PromptMigrate warnings once each as `Warning: …` on stderr.
+Logic is in `src/promptmigrate/core.py` (public facade, revision parsing, graph, replay and migration transactions), `store.py` (declared environments and SQLite read/write connections), `protocol.py` (strict JSON loading, limits, config validation, `canonical`/`same`), `secretscan.py` (heuristic secret rules, fingerprinted allowlist, redaction; no I/O) and `errors.py` (error and warning types). `cli.py` is a thin argparse dispatcher: it prints any `MigrationError`, `OSError` or `sqlite3.Error` as `Error: …` on stderr and exits 1. It prints captured PromptMigrate warnings once each as `Warning: …` on stderr.
 
 **Four states, kept distinct:**
 1. **Drafts:** `.promptmigrate/drafts/<name>.json`, the desired config (one JSON object per name).
 2. **Source history:** `.promptmigrate/versions/<12hex>_<slug>.json`. Each revision has `revision`, `down_revision`, `message`, `created_at`, and `changes: {name: {before, after}}`. These are full snapshots, and `null` means the config is absent.
-3. **Applied env state:** `.promptmigrate/states/<env>.sqlite3` (gitignored), with tables `applied_revisions(seq, revision, checksum, applied_at)` and `prompts(name, config)`.
-4. **Runtime state:** not implemented. Nothing connects SQLite state to an application, and `--env prod` is only a local file.
+3. **Environment declarations:** `.promptmigrate/environments.json` (Git tracked), with canonical names and metadata. Legacy projects are inferred for reads and adopted before the first attempted mutation that resolves a declared inferred environment; later migration validation can still fail.
+4. **Applied env state:** `.promptmigrate/states/<env>.sqlite3` (gitignored), with tables `applied_revisions(seq, revision, checksum, applied_at)` and `prompts(name, config)`. `check`, `current`, and `get` use read-only SQLite; missing state is base, incomplete state is an error.
+5. **Runtime state:** not implemented. Nothing connects SQLite state to an application, and `--env prod` is only a local file with an explicit warning.
 
 **Cross-function flow:**
 - **`load_revisions()`** runs in almost every command. It parses all version files and enforces one linear chain: one root, no branches, no cycles. It then replays the whole chain from `{}`, so every revision's `before` must match the rebuilt state. Source history validates itself, independent of any env.

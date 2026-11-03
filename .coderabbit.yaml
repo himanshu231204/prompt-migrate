@@ -1,0 +1,32 @@
+language: en-US
+inheritance: true
+reviews:
+  profile: chill
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+    base_branches:
+      - "^main$"
+  path_instructions:
+    - path: "src/promptmigrate/**"
+      instructions: |
+        Preserve the boundary between declarative JSON revisions and applied local environment state.
+        Flag changes that execute revision code, call an LLM or provider inside a SQLite transaction,
+        silently alter revision format or checksum semantics, or imply that local state changes deploy
+        configuration to a real production environment.
+    - path: "tests/**"
+      instructions: |
+        Check that tests cover error paths and preserve filesystem and database state on failure.
+        Keep cross-version behavior in mind for the Python versions exercised by Docker CI.
+        Never put token-shaped secrets in fixtures; construct fake secret values at runtime.
+    - path: ".github/workflows/**"
+      instructions: |
+        Verify that the full test suite runs inside the CI Docker container, with no separate host-side
+        test job. Keep workflow token permissions least-privilege and disable checkout credential
+        persistence when later Git operations are unnecessary.
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "AGENTS.md"

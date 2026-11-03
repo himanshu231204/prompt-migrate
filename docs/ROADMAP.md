@@ -22,7 +22,7 @@
 
 ### Cycle 1 (PRs 1–6 + 3b)
 
-- [ ] Connection lifecycle fix; CI matrix across Ubuntu/Windows/macOS.
+- [ ] Connection lifecycle fix; Linux Docker CI matrix across Python 3.10, 3.12 and 3.13 (native Windows/macOS CI not included).
 - [ ] Characterization tests and legacy compatibility fixtures.
 - [ ] Strict parsing (duplicate keys, NaN, size/depth, symlinks), compatibility tiers, canonical equality.
 - [ ] Heuristic secret safeguard: `revision` blocks, `diff`/`get` redact, reviewed allowlist.

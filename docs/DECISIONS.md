@@ -44,6 +44,13 @@ Each ADR documents a decision and its rationale. **Confirmed** means the convers
 **Why:** zero server dependency, transactions.  
 **Limit:** not real production rollout nor shared multi-machine state.
 
+## ADR-012 — Declared environments and read-only state inspection
+
+**Status:** implemented (Phase 1 cycle 1, PR 4).
+**Decision:** `.promptmigrate/environments.json` is the authority for environment names and metadata. Names resolve case-insensitively to the manifest spelling, including CLI status labels. Existing projects without a manifest are adopted in memory for reads and persisted atomically on the first attempted mutation that resolves a declared inferred environment; later migration validation may still fail.
+**Why:** prevent accidental state-file creation for typos, make environment listing explicit, and ensure inspection cannot repair or mutate applied state.
+**Consequence:** reads use SQLite `mode=ro`; absent databases mean base state, while incomplete/corrupt databases, WAL-mode databases, and symlinked state paths fail closed. Writes initialize only absent databases and retain local transactional semantics. Selecting `prod`, `production`, or `live` for an operation emits a warning; no remote activation is implied.
+
 ## ADR-006 — Full snapshot changes
 
 **Status:** recommended and implemented in starter.  
