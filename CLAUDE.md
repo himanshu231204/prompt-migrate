@@ -39,8 +39,8 @@ Logic is in `src/promptmigrate/core.py` (public facade, revision parsing, graph,
 **Four states, kept distinct:**
 1. **Drafts:** `.promptmigrate/drafts/<name>.json`, the desired config (one JSON object per name).
 2. **Source history:** `.promptmigrate/versions/<12hex>_<slug>.json`. Each revision has `revision`, `down_revision`, `message`, `created_at`, and `changes: {name: {before, after}}`. These are full snapshots, and `null` means the config is absent.
-3. **Environment declarations:** `.promptmigrate/environments.json` (Git tracked), with canonical names and metadata. Legacy projects are inferred for reads and adopted before the first attempted mutation that resolves a declared inferred environment; later migration validation can still fail.
-4. **Applied env state:** `.promptmigrate/states/<env>.sqlite3` (gitignored), with tables `applied_revisions(seq, revision, checksum, applied_at)` and `prompts(name, config)`. `check`, `current`, and `get` use read-only SQLite; missing state is base, incomplete state is an error.
+3. **Environment declarations:** `.promptmigrate/environments.json` (Git tracked), with canonical names and metadata. Legacy projects are inferred for reads (`dev`, `staging`, plus validly named state files) and adopted after the first successful mutation.
+4. **Applied env state:** `.promptmigrate/states/<env>.sqlite3` (gitignored), with tables `applied_revisions(seq, revision, checksum, applied_at)` and `prompts(name, config)`. `check`, `current`, and `get` use read-only SQLite in one read transaction; missing state is base, incomplete state is an error.
 5. **Runtime state:** not implemented. Nothing connects SQLite state to an application, and `--env prod` is only a local file with an explicit warning.
 
 **Cross-function flow:**
