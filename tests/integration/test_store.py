@@ -11,10 +11,8 @@ import warnings
 
 import pytest
 
-from pmtest import nested_config, pm_dir, symlink_or_skip
+from pmtest import SYNTAX_MESSAGE, manifest, nested_config, pm_dir, snapshot, store_api, symlink_or_skip
 from promptmigrate import errors, protocol
-from test_environments import manifest, store_api, SYNTAX_MESSAGE
-from test_read_only_env import snapshot
 
 
 @pytest.mark.parametrize("value", [
