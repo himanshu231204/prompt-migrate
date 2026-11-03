@@ -15,8 +15,17 @@ python -m venv .venv
 source .venv/bin/activate                        # Windows PowerShell: .venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev]"
 python -m pytest -q                              # the whole suite
-PYTHONPATH=src python -m unittest discover -s tests -v   # the original seven tests (PowerShell: $env:PYTHONPATH='src')
+PYTHONPATH=src python -m unittest discover -s tests -v   # the original seven tests
 python -m promptmigrate --project /tmp/demo init # the CLI
+```
+
+In PowerShell, after `.venv\Scripts\Activate.ps1`:
+
+```powershell
+python -m pip install -e ".[dev]"
+python -m pytest -q
+$env:PYTHONPATH = 'src'; python -m unittest discover -s tests -v
+python -m promptmigrate --project $env:TEMP\demo init
 ```
 
 Every command after the activation runs in the virtual environment. Activate it again in each new shell.
