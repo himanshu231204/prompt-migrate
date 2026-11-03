@@ -90,7 +90,7 @@ def test_revision_size_limit_checked_against_real_file_size(project, monkeypatch
 
 def test_revision_rechecks_after_values(project, monkeypatch):
     """I15 defence in depth: even with draft validation bypassed, revision() refuses an invalid new after."""
-    monkeypatch.setattr(core, "read_drafts", lambda project_dir: {"assistant": {"model": 1}})
+    monkeypatch.setattr("promptmigrate.project.read_drafts", lambda project_dir: {"assistant": {"model": 1}})
     message = "New revision would be invalid: reserved-field-type assistant.model"
     with pytest.raises(SchemaError, match=re.escape(message)):
         revision(project, "bypass")

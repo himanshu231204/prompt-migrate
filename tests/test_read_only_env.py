@@ -5,7 +5,7 @@ import sqlite3
 import pytest
 
 from pmtest import CFG, create, fake_key, pm_dir, tree_snapshot, write_revision
-from promptmigrate import core, errors
+from promptmigrate import apply, core, errors
 from test_environments import error_type, manifest, run_cli, store_api
 
 
@@ -111,14 +111,14 @@ def test_corrupt_state_reads_are_storage_errors_without_repair(project, capsys, 
         elif corruption == "recursive_json":
             marker = '{"trigger":"recursion"}'
             db.execute("UPDATE prompts SET config=? WHERE name='assistant'", (marker,))
-            original_loads = core.json.loads
+            original_loads = apply.json.loads
 
             def loads(value, *args, **kwargs):
                 if value == marker:
                     raise RecursionError("simulated JSON decoder recursion limit")
                 return original_loads(value, *args, **kwargs)
 
-            monkeypatch.setattr(core.json, "loads", loads)
+            monkeypatch.setattr(apply.json, "loads", loads)
         else:
             db.execute("DROP TABLE prompts")
             db.execute("CREATE TABLE prompts (name TEXT PRIMARY KEY, config TEXT)")

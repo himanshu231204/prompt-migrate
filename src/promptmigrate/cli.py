@@ -1,17 +1,16 @@
 """Command line entry point."""
 
 import argparse
-import json
 import sqlite3
 import sys
 import warnings
-from pathlib import Path
-from . import store
-from .core import (
-    MigrationError, audit_secrets, check, downgrade, env_add, env_list, init,
-    load_revisions, pretty, redacted_config, redacted_diff, redacted_history, revision, upgrade,
-)
-from .errors import PromptMigrateWarning
+from .commands import check, current, diff, downgrade, env, get, history, init, revision, upgrade
+from .errors import MigrationError, PromptMigrateWarning
+
+COMMANDS = {
+    "init": init, "revision": revision, "history": history, "diff": diff, "current": current,
+    "upgrade": upgrade, "downgrade": downgrade, "check": check, "get": get, "env": env,
+}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -83,47 +82,7 @@ def _print_warnings(caught: list[warnings.WarningMessage]) -> None:
 
 
 def _run(args: argparse.Namespace) -> None:
-    project = Path(args.project)
-    if args.command == "init":
-        print(f"Initialized {init(project)}")
-    elif args.command == "revision":
-        r = revision(project, args.message)
-        print(f"Created {r.revision} (parent: {r.down_revision or 'base'}): {r.path}")
-    elif args.command == "history":
-        revisions, _redacted = redacted_history(project, load=load_revisions)
-        for r in revisions:
-            print(f"{r.revision} <- {r.down_revision or 'base'} | {r.message}")
-    elif args.command == "diff":
-        changes, _redacted = redacted_diff(project)
-        print(pretty(changes))
-    elif args.command == "current":
-        label = store.display_name(project, args.env)
-        n, total = check(project, args.env)
-        revisions = load_revisions(project)
-        print(f"{label}: {revisions[n-1].revision if n else 'base'} ({n}/{total} applied)")
-    elif args.command == "upgrade":
-        label = store.display_name(project, args.env)
-        ids = upgrade(project, args.env, args.target)
-        print(f"{label}: applied {len(ids)} revision(s): {', '.join(ids) or '(already current)'}")
-    elif args.command == "downgrade":
-        label = store.display_name(project, args.env)
-        ids = downgrade(project, args.env, args.target)
-        print(f"{label}: reverted {len(ids)} revision(s): {', '.join(ids) or '(nothing to revert)'}")
-    elif args.command == "check":
-        label = store.display_name(project, args.env)
-        audit_secrets(project)
-        n, total = check(project, args.env, args.require_head)
-        print(f"OK: {label} is consistent ({n}/{total} revisions applied)")
-    elif args.command == "get":
-        config, _paths = redacted_config(project, args.env, args.name)
-        print(pretty(config), end="")
-    elif args.command == "env":
-        if args.env_command == "add":
-            env_add(project, args.name)
-            print(f"Added environment: {args.name}")
-        elif args.env_command == "list":
-            for name, has_state in env_list(project):
-                print(f"{name}: {'state exists' if has_state else 'no state'}")
+    COMMANDS[args.command].run(args)
 
 
 if __name__ == "__main__":

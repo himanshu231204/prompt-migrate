@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from pmtest import nested_config, pm_dir, set_draft, symlink_or_skip, tree_snapshot
-from promptmigrate import cli, core, errors, protocol
+from promptmigrate import apply, cli, core, errors, protocol
 
 
 SYNTAX_MESSAGE = "Environment must be alphanumeric, starting with a letter"
@@ -476,13 +476,13 @@ def test_read_only_verification_uses_one_snapshot(project, monkeypatch, command)
     core.upgrade(project, "dev")
     seen = []
     for name in ("_applied", "_actual"):
-        real = getattr(core, name)
+        real = getattr(apply, name)
 
         def tracked(db, _real=real, _name=name):
             seen.append((_name, db.in_transaction))
             return _real(db)
 
-        monkeypatch.setattr(core, name, tracked)
+        monkeypatch.setattr(apply, name, tracked)
     if command == "check":
         core.check(project, "dev")
     else:
