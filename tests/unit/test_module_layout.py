@@ -76,7 +76,7 @@ LAYERS = {
     "errors": 0, "protocol": 1, "secretscan": 2, "project": 3, "revisions": 4, "store": 4,
     "draftdiff": 5, "apply": 5, "commands": 6, "cli": 7,
 }
-SRC = Path(__file__).resolve().parents[1] / "src" / "promptmigrate"
+SRC = Path(importlib.import_module("promptmigrate").__file__).resolve().parent
 
 
 @pytest.mark.parametrize("module, name", [(m, n) for m, names in CORE_NAMES.items() for n in names])

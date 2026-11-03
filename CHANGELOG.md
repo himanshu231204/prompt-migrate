@@ -14,6 +14,8 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
 - `core.py` is now a re-export facade (ADR-022). Logic lives in `project`, `revisions`, `draftdiff`, `apply` and
   one `commands.<verb>` module per CLI verb; `cli.py` only parses and dispatches. `promptmigrate.__all__` exposes the
   same public names as `core`. Monkeypatching `core` or `cli` no longer changes behaviour; patch the defining module.
+- Tests are grouped by suite in `tests/{unit,integration,contract,security}/`. The original `test_core.py` stays at
+  the root. Helpers that one test module imported from another moved to `tests/pmtest.py`.
 - No CLI, file-format or checksum change: CLI output is byte-identical to the previous release.
 
 ### Phase 1 cycle 1 — PR 4: declared environments and read-only state reads

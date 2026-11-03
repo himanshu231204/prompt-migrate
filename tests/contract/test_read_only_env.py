@@ -4,16 +4,8 @@ import sqlite3
 
 import pytest
 
-from pmtest import CFG, create, fake_key, pm_dir, tree_snapshot, write_revision
+from pmtest import CFG, create, error_type, fake_key, manifest, pm_dir, run_cli, snapshot, store_api, write_revision
 from promptmigrate import apply, core, errors
-from test_environments import error_type, manifest, run_cli, store_api
-
-
-def snapshot(project):
-    return tree_snapshot(project), {
-        p.relative_to(project).as_posix(): p.stat().st_mtime_ns
-        for p in project.rglob("*") if p.is_file()
-    }
 
 
 @pytest.mark.parametrize("command", ["check", "current", "get"])

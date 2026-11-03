@@ -2,7 +2,7 @@
 
 ## 1. Module layout
 
-Implemented (ADR-022). Each concept has one module; imports point down this order, and `tests/test_module_layout.py`
+Implemented (ADR-022). Each concept has one module; imports point down this order, and `tests/unit/test_module_layout.py`
 enforces it:
 
 ```text

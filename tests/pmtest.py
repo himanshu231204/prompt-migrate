@@ -1,5 +1,7 @@
 """Shared helpers for the PromptMigrate test suite (imported directly by test modules)."""
 import hashlib
+import importlib
+import importlib.util
 import json
 import shutil
 import warnings
@@ -7,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from promptmigrate import cli, errors
 from promptmigrate.core import pretty
 
 CFG = {"messages": [{"role": "system", "content": "A"}]}
@@ -178,3 +181,42 @@ def pm_warnings(fn, *args):
         warnings.simplefilter("always")
         result = fn(*args)
     return result, [str(w.message) for w in caught if issubclass(w.category, PromptMigrateWarning)]
+
+
+# Environment helpers shared by the environment, store and read-only suites.
+
+SYNTAX_MESSAGE = "Environment must be alphanumeric, starting with a letter"
+
+
+def manifest(project, environments):
+    path = pm_dir(project) / "environments.json"
+    path.write_text(json.dumps({"environments": environments}), encoding="utf-8")
+    return path
+
+
+def store_api():
+    # Assert absent PR4 interfaces at call time: collection must stay usable.
+    assert importlib.util.find_spec("promptmigrate.store") is not None, "PR4 environment store is missing"
+    return importlib.import_module("promptmigrate.store")
+
+
+def error_type(name):
+    assert hasattr(errors, name), f"PR4 error/warning type {name} is missing"
+    return getattr(errors, name)
+
+
+def run_cli(capsys, project, *argv):
+    try:
+        code = cli.main(["--project", str(project), *argv])
+    except SystemExit as exc:
+        out, err = capsys.readouterr()
+        pytest.fail(f"PR4 CLI command was rejected (exit {exc.code}): {err}")
+    out, err = capsys.readouterr()
+    return code, out, err
+
+
+def snapshot(project):
+    return tree_snapshot(project), {
+        p.relative_to(project).as_posix(): p.stat().st_mtime_ns
+        for p in project.rglob("*") if p.is_file()
+    }

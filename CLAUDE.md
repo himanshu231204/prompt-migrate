@@ -13,7 +13,7 @@ Workflow, TDD rules, hard rules and the review report format are in [`AGENTS.md`
 - Implemented: `init`, `revision`, `history`, `diff`, `current`, `upgrade`, `downgrade`, `check`, `get`, `env add`, `env list`.
 - Current scope: Phase 1, cycle 1, in `docs/ROADMAP.md`.
 - `docs/` also describes future modules and commands (`plan`, `eval`, `export`, Postgres, SDK, …). They don't exist yet.
-- Test baseline: after PR 4, Windows 11 / Python 3.11.9 reports `469 passed, 16 skipped, 33 warnings`; the original seven unittest tests pass. Skips include symlink and case-collision cases unavailable on this host. Linux/macOS are claimed only after a remote CI run.
+- Test baseline: after the package layout refactor, Windows 11 / Python 3.11.9 reports `618 passed, 18 skipped, 33 warnings`; the original seven unittest tests pass. Skips include symlink and case-collision cases unavailable on this host. Linux/macOS are claimed only after a remote CI run.
 
 ## Commands
 
@@ -23,12 +23,13 @@ The runtime is standard-library only (Python ≥ 3.10). Put `src` on the path; i
 python -m pip install -e ".[dev]"                            # entry point + pytest, hypothesis, pytest-cov
 python -m pytest -q                                          # all tests (CI runs it with -v); pyproject sets pythonpath=src
 python -m pytest tests/test_core.py::PromptMigrateTests::test_state_drift_detected   # one test
+python -m pytest tests/security                               # one suite (unit, integration, contract, security)
 python -m pytest -k drift                                    # tests matching a name
 PYTHONPATH=src python -m unittest discover -s tests -v       # the original unittest suite still runs this way
 PYTHONPATH=src python -m promptmigrate --project <dir> history   # CLI from source
 ```
 
-- `tests/` is not a package. With unittest, select one test with `-k`, not with a dotted path.
+- `tests/` is not a package. Suites live in `tests/{unit,integration,contract,security}/` (map in `docs/TESTING_STRATEGY.md`); helpers in `tests/pmtest.py`. `test_core.py` stays at the root for the unittest gate. With unittest, select one test with `-k`, not with a dotted path.
 - In PowerShell, use `$env:PYTHONPATH='src'`.
 - No linter or type checker is configured.
 
