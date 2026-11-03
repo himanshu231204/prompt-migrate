@@ -15,6 +15,9 @@ from typing import Any
 
 from .errors import SchemaError
 
+# The one warning text printed whenever display output had values redacted.
+_REDACTED = "{count} secret-like value(s) redacted from this output; detection is heuristic and can miss secrets"
+
 VALUE_RULES: dict[str, re.Pattern[str]] = {
     "openai-anthropic-key": re.compile(r"sk-[A-Za-z0-9_-]{20,}"),
     "aws-access-key-id": re.compile(r"AKIA[0-9A-Z]{16}"),

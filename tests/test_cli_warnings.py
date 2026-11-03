@@ -5,7 +5,7 @@ import warnings
 import pytest
 
 from pmtest import CFG, LEGACY_NAMES, LEGACY_SUFFIX, LEGACY_WARNINGS, install_fixture, install_legacy, set_draft
-from promptmigrate import cli
+from promptmigrate import cli, revisions
 from promptmigrate.errors import LegacyRevisionWarning, SchemaError
 
 COMMANDS = [["history"], ["upgrade"], ["check"], ["current"], ["get", "assistant"], ["downgrade", "base"]]
@@ -40,7 +40,7 @@ def test_duplicates_dropped_in_first_seen_order(project, monkeypatch, capsys):
         for message in ("first", "second", "first"):
             warnings.warn(message, LegacyRevisionWarning)
         return []
-    monkeypatch.setattr(cli, "load_revisions", noisy)
+    monkeypatch.setattr(revisions, "load_revisions", noisy)
     assert run(capsys, project, "history") == (0, "", "Warning: first\nWarning: second\n")
 
 
@@ -48,7 +48,7 @@ def test_warnings_print_before_the_error(project, monkeypatch, capsys):
     def failing(_project):
         warnings.warn("careful", LegacyRevisionWarning)
         raise SchemaError("boom")
-    monkeypatch.setattr(cli, "load_revisions", failing)
+    monkeypatch.setattr(revisions, "load_revisions", failing)
     assert run(capsys, project, "history") == (1, "", "Warning: careful\nError: boom\n")
 
 
@@ -56,7 +56,7 @@ def test_warnings_print_before_an_unhandled_exception_propagates(project, monkey
     def failing(_project):
         warnings.warn("careful", LegacyRevisionWarning)
         raise RuntimeError("boom")
-    monkeypatch.setattr(cli, "load_revisions", failing)
+    monkeypatch.setattr(revisions, "load_revisions", failing)
     with pytest.raises(RuntimeError):
         cli.main(["--project", str(project), "history"])
     assert capsys.readouterr().err == "Warning: careful\n"
@@ -69,7 +69,7 @@ def test_other_warnings_pass_through_unprinted(project, monkeypatch, capsys):
     def noisy(_project):
         warnings.warn("from a library", DeprecationWarning)
         return []
-    monkeypatch.setattr(cli, "load_revisions", noisy)
+    monkeypatch.setattr(revisions, "load_revisions", noisy)
     assert run(capsys, project, "history") == (0, "", "")
     assert shown == [DeprecationWarning]
 

@@ -8,7 +8,7 @@ You are helping design and eventually implement **PromptMigrate**, an open-sourc
 
 ## Repository map
 
-- Code: `src/promptmigrate/` (currently `core.py`, `protocol.py`, `secretscan.py`, `errors.py`, `cli.py`), tests: `tests/`.
+- Code: `src/promptmigrate/`, split by concept (`protocol/`, `project.py`, `revisions.py`, `draftdiff.py`, `store/`, `apply.py`, `commands/`, `cli.py`; `core.py` is the re-export facade; see ADR-022), tests: `tests/`.
 - Design docs: `docs/` — start with `README.md` and `docs/HANDOFF.md`.
 - Current scope: Phase 1 cycle 1 (PRs 1–6 + 3b) in `docs/ROADMAP.md`; finishing it does not finish Phase 1.
 - Decision record: `docs/DECISIONS.md`; open design questions: `docs/OPEN_QUESTIONS.md`.

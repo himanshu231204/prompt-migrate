@@ -1,0 +1,134 @@
+"""Source history: revision files, the linear revision graph, and replay of changes from the empty state."""
+
+from __future__ import annotations
+
+import hashlib
+import re
+import warnings
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from . import project, protocol
+from .errors import LegacyRevisionWarning, MigrationConflictError, RevisionGraphError, SchemaError
+
+_LEGACY = "revision {rid}: {rule} (accepted for compatibility; create a new revision to fix)"
+
+
+@dataclass(frozen=True)
+class Revision:
+    revision: str
+    down_revision: str | None
+    message: str
+    created_at: str
+    changes: dict[str, dict[str, Any]]
+    checksum: str
+    path: Path
+
+
+def _hash(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def load_revisions(project_dir: Path) -> list[Revision]:
+    root = project.require_init(project_dir)
+    unsorted: dict[str, Revision] = {}
+    violations: dict[str, list[str]] = {}
+    for path in sorted((root / "versions").glob("*.json")):
+        item, raw, file_rules = protocol.load_json(path, kind="revision", root=root)
+        if not isinstance(item, dict) or not all(
+            k in item for k in ("revision", "down_revision", "message", "created_at", "changes")
+        ):
+            raise SchemaError(f"Invalid migration format: {path.name}")
+        rid, parent, changes = item["revision"], item["down_revision"], item["changes"]
+        if not isinstance(rid, str) or not re.fullmatch(r"[a-f0-9]{12}", rid):
+            raise SchemaError(f"Invalid revision id in {path.name}")
+        if parent is not None and (not isinstance(parent, str) or not re.fullmatch(r"[a-f0-9]{12}", parent)):
+            raise SchemaError(f"Invalid down_revision in {path.name}")
+        if not isinstance(item["message"], str) or not isinstance(item["created_at"], str):
+            raise SchemaError(f"Invalid metadata in {path.name}")
+        if not isinstance(changes, dict) or not changes:
+            raise SchemaError(f"Migration must contain nonempty changes: {path.name}")
+        for name, change in changes.items():
+            if not isinstance(change, dict) or set(change) != {"before", "after"}:
+                raise SchemaError(f"Invalid change operation in {path.name}: {name}")
+            for field in ("before", "after"):
+                if change[field] is not None:
+                    protocol.validate_config(name, change[field])
+        if rid in unsorted:
+            raise RevisionGraphError(f"Duplicate revision id: {rid}")
+        found = list(file_rules)
+        for name, change in changes.items():
+            if protocol.same(change["before"], change["after"]):
+                found.append(f"no-op-change {name}")
+            # Only after values: replay makes every before equal an earlier after, so each violation shows once.
+            if change["after"] is not None:
+                found.extend(protocol.config_violations(name, change["after"]))
+        violations[rid] = found
+        unsorted[rid] = Revision(
+            rid, parent, item["message"], item["created_at"], changes, _hash(raw), path
+        )
+
+    if not unsorted:
+        return []
+    roots = [r for r in unsorted.values() if r.down_revision is None]
+    if len(roots) != 1:
+        raise RevisionGraphError("MVP requires exactly one root revision (linear history)")
+    children: dict[str, list[Revision]] = {}
+    for r in unsorted.values():
+        if r.down_revision is not None:
+            if r.down_revision not in unsorted:
+                raise RevisionGraphError(f"Missing parent of revision {r.revision}: {r.down_revision}")
+            children.setdefault(r.down_revision, []).append(r)
+    if any(len(kids) > 1 for kids in children.values()):
+        raise RevisionGraphError("Branching detected. MVP only supports one linear head; resolve in Git before deploying")
+    result = []
+    current = roots[0]
+    while current is not None and current.revision not in {r.revision for r in result}:
+        result.append(current)
+        current = children.get(current.revision, [None])[0]
+    if len(result) != len(unsorted):
+        raise RevisionGraphError("Disconnected or cyclic migration history")
+    # Validate declarative preconditions across all revisions, independently of environments.
+    replay_revisions(result)
+    names: set[str] = set()
+    for r in result:
+        for name, change in r.changes.items():
+            if change["after"] is None:
+                names.discard(name)
+            else:
+                names.add(name)
+        found = violations[r.revision]
+        found.extend(f"case-collision {group}" for group in protocol.case_collisions(names)
+                     if any(member in r.changes for member in group.split("/")))
+        for rule in found:
+            warnings.warn(_LEGACY.format(rid=r.revision, rule=rule), LegacyRevisionWarning, stacklevel=2)
+    return result
+
+
+def _apply_changes(
+    state: dict[str, dict[str, Any]],
+    revision: Revision,
+    *,
+    backward: bool = False,
+) -> None:
+    for name, change in revision.changes.items():
+        expected = change["after"] if backward else change["before"]
+        replacement = change["before"] if backward else change["after"]
+        if not protocol.same(state.get(name), expected):
+            direction = "downgrade" if backward else "upgrade"
+            raise MigrationConflictError(
+                f"{direction} {revision.revision}: unexpected current value for {name!r}; "
+                "possible drift or invalid revision dependency"
+            )
+        if replacement is None:
+            state.pop(name, None)
+        else:
+            state[name] = replacement
+
+
+def replay_revisions(revisions: list[Revision]) -> dict[str, dict[str, Any]]:
+    state: dict[str, dict[str, Any]] = {}
+    for r in revisions:
+        _apply_changes(state, r)
+    return state

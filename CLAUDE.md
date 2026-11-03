@@ -34,7 +34,7 @@ PYTHONPATH=src python -m promptmigrate --project <dir> history   # CLI from sour
 
 ## Architecture
 
-Logic is in `src/promptmigrate/core.py` (public facade, revision parsing, graph, replay and migration transactions), `store.py` (declared environments and SQLite read/write connections), `protocol.py` (strict JSON loading, limits, config validation, `canonical`/`same`), `secretscan.py` (heuristic secret rules, fingerprinted allowlist, redaction; no I/O) and `errors.py` (error and warning types). `cli.py` is a thin argparse dispatcher: it prints any `MigrationError`, `OSError` or `sqlite3.Error` as `Error: …` on stderr and exits 1. It prints captured PromptMigrate warnings once each as `Warning: …` on stderr.
+Logic is split by concept (ADR-022; layer order in `docs/LOW_LEVEL_DESIGN.md` §1): `protocol/` (limits, strict JSON loading, `canonical`/`same`, config and environment-name rules), `secretscan.py` (heuristic secret rules, fingerprinted allowlist, redaction; no I/O), `project.py` (workspace, drafts, allowlist), `revisions.py` (revision parsing, graph, replay), `draftdiff.py`, `store/` (declared environments, project lock, SQLite read/write connections), `apply.py` (`_verify` and the row+ledger writes), `commands/<verb>.py` (each verb's function plus `run(args)` printing its text output) and `errors.py`. `core.py` re-exports the public API and defines nothing. `cli.py` only parses and dispatches: it prints any `MigrationError`, `OSError` or `sqlite3.Error` as `Error: …` on stderr and exits 1. It prints captured PromptMigrate warnings once each as `Warning: …` on stderr.
 
 **Four states, kept distinct:**
 1. **Drafts:** `.promptmigrate/drafts/<name>.json`, the desired config (one JSON object per name).
@@ -53,7 +53,7 @@ Logic is in `src/promptmigrate/core.py` (public facade, revision parsing, graph,
   - Config rows and the ledger change in one SQLite transaction.
 - **Checksums** are SHA-256 of the raw revision file bytes at apply time. Any byte change to an applied revision, including whitespace or CRLF, blocks that env. Don't change checksum or file-format semantics without an explicit format version.
 - Downgrade deletes ledger rows. There is no audit or event log yet.
-- `core.py` is the public API that tests import. Split it into modules gradually, keeping its exported names and signatures stable.
+- `core.py` is the public facade that tests import; keep its exported names and signatures stable. Inside the package, call collaborators through their module (`project.read_drafts(...)`), and in tests patch the defining module, never `core` or `cli`.
 
 ## Conventions
 
