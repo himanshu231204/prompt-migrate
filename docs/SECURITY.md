@@ -105,6 +105,6 @@ Do **not** commit API keys, user data, credentials, private documents, or produc
 - Atomic pointer activation with concurrency control.
 - Traceability from inference to immutable release ID.
 
-## Security disclosure policy (proposal)
+## Security disclosure policy
 
-Before public release, add a `SECURITY.md` with supported versions and private vulnerability reporting channel chosen by maintainers. **Do not invent a security email address** before it exists.
+The root [`SECURITY.md`](../SECURITY.md) names the supported version (latest `main`) and the private channel: GitHub private vulnerability reporting. **Do not invent a security email address** before one exists.
