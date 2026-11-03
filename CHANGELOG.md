@@ -7,7 +7,7 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
 ### Phase 1 cycle 1 — PR 4: declared environments and read-only state reads
 
 - **Contract:** `init` declares `dev` and `staging` in `.promptmigrate/environments.json`. `env add <name>` adds a declaration atomically; `env list` reports each declared name and whether its local SQLite file exists.
-- **Contract:** environment names are resolved case-insensitively using canonical manifest spelling, including CLI status labels. Undeclared names fail before DB access. Legacy projects without a manifest are inferred in memory; the first attempted mutation for a declared inferred environment persists that manifest and prints one adoption warning, even if later migration validation fails.
+- **Contract:** environment names are resolved case-insensitively using canonical manifest spelling, including CLI status labels. Undeclared names fail before DB access. Legacy projects without a manifest are inferred in memory as `dev`, `staging` and every validly named `states/*.sqlite3` stem (stems no release could have created are ignored); the first successful `upgrade`, `downgrade` or `env add` persists that manifest and prints one adoption warning. A rejected command writes no manifest.
 - **Contract:** `check`, `current`, and `get` use read-only SQLite connections; missing state is the empty base state. Reads never create or repair database files. Existing incomplete/corrupt DBs, WAL-mode DBs, and state symlinks fail as storage errors.
 - Production-like environment names warn that their state remains local SQLite. No provider deployment or production activation is added.
 

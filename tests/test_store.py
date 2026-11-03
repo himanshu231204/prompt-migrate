@@ -90,7 +90,7 @@ def test_store_manifest_symlink(project):
 
 @pytest.mark.parametrize("stems,expected", [
     ([], {"dev": {}, "staging": {}}),
-    (["Zulu", "alpha", "Qa"], {"alpha": {}, "Qa": {}, "Zulu": {}}),
+    (["Zulu", "alpha", "Qa"], {"alpha": {}, "dev": {}, "Qa": {}, "staging": {}, "Zulu": {}}),
 ])
 def test_store_legacy_discovery_is_in_memory(project, stems, expected):
     api = store_api()
@@ -106,10 +106,20 @@ def test_store_legacy_discovery_is_in_memory(project, stems, expected):
     assert caught == [] and snapshot(project) == before
 
 
-def test_store_invalid_legacy_stem_is_rejected(project):
+def test_store_invalid_legacy_stem_is_ignored(project):
     api = store_api()
     (pm_dir(project) / "environments.json").unlink()
     (pm_dir(project) / "states" / "1bad.sqlite3").touch()
+    assert api.read_environments(project) == ({"dev": {}, "staging": {}}, False)
+
+
+def test_store_reserved_legacy_stem_still_fails_closed(project):
+    # Pre-PR4 releases could create CON.sqlite3 outside Windows, so it may be real state.
+    api = store_api()
+    (pm_dir(project) / "environments.json").unlink()
+    (pm_dir(project) / "states" / "CON.sqlite3").touch()
+    if not (pm_dir(project) / "states" / "CON.sqlite3").is_file():
+        pytest.skip("reserved device name cannot be a file on this host")
     with pytest.raises(errors.SchemaError):
         api.read_environments(project)
 
@@ -313,7 +323,7 @@ def test_store_adoption_warning_only_first_successful_mutation(project, operatio
         else:
             api.add_environment(project, "qa")
             api.add_environment(project, "qb")
-    expected = {"dev": {}} if legacy_state else {"dev": {}, "staging": {}}
+    expected = {"dev": {}, "staging": {}}
     if operation == "add":
         expected.update({"qa": {}, "qb": {}})
     assert api.read_environments(project) == (expected, True)

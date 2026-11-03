@@ -3,6 +3,8 @@ import importlib
 import importlib.util
 import json
 import os
+import sqlite3
+import stat
 import warnings
 from pathlib import Path
 
@@ -217,18 +219,19 @@ def test_legacy_discovery_is_in_memory(project, existing):
         core.upgrade(project, "dev")
         (pm_dir(project) / "environments.json").unlink(missing_ok=True)
     before = tree_snapshot(project)
-    expected = {"dev": {}} if existing else {"dev": {}, "staging": {}}
+    expected = {"dev": {}, "staging": {}}
     assert store_api().read_environments(project) == (expected, False)
-    assert core_api("env_list")(project) == [(name, existing) for name in expected]
+    assert core_api("env_list")(project) == [("dev", existing), ("staging", False)]
     assert tree_snapshot(project) == before
 
 
-@pytest.mark.parametrize("stem", ["1bad", "a" * 65])
-def test_legacy_invalid_stems_rejected(project, stem):
+@pytest.mark.parametrize("stem", ["1bad", "a" * 65, "backup.old", "my env"])
+def test_legacy_stems_promptmigrate_never_created_are_ignored(project, stem):
+    # Pre-PR4 releases validated names with the same syntax, so these files cannot be PromptMigrate state.
     (pm_dir(project) / "environments.json").unlink(missing_ok=True)
     (pm_dir(project) / "states" / f"{stem}.sqlite3").touch()
-    with pytest.raises(errors.SchemaError):
-        store_api().read_environments(project)
+    assert store_api().read_environments(project) == ({"dev": {}, "staging": {}}, False)
+    assert core.check(project, "dev") == (0, 0)
 
 
 def test_legacy_case_colliding_stems_rejected(project):
@@ -255,7 +258,7 @@ def test_first_mutation_adopts_once(project, operation, existing):
         warnings.simplefilter("always")
         mutate(project, "qa" if operation == "env_add" else "dev")
         assert path.exists(), "first mutation must persist inferred declarations"
-        expected = {"dev": {}} if existing else {"dev": {}, "staging": {}}
+        expected = {"dev": {}, "staging": {}}
         if operation == "env_add":
             expected["qa"] = {}
         assert json.loads(path.read_text(encoding="utf-8")) == {"environments": expected}
@@ -400,3 +403,103 @@ def test_mutations_use_canonical_environment_spelling(project, operation):
     paths = list((pm_dir(project) / "states").glob("*.sqlite3"))
     assert [p.name for p in paths] == ["Qa.sqlite3"]
     assert core.check(project, "QA") == ((1, 1) if operation == "upgrade" else (0, 1))
+
+
+def legacy(project):
+    (pm_dir(project) / "environments.json").unlink(missing_ok=True)
+    return pm_dir(project) / "environments.json"
+
+
+@pytest.mark.parametrize("stems,expected", [
+    (["prod"], ["dev", "prod", "staging"]),
+    (["Dev", "qa"], ["Dev", "qa", "staging"]),
+])
+def test_legacy_inference_keeps_default_environments(project, stems, expected):
+    legacy(project)
+    for stem in stems:
+        (pm_dir(project) / "states" / f"{stem}.sqlite3").touch()
+    environments, existed = store_api().read_environments(project)
+    assert (list(environments), existed) == (expected, False)
+
+
+def test_legacy_prod_only_workspace_still_accepts_default_env(project, capsys):
+    legacy(project)
+    (pm_dir(project) / "states" / "prod.sqlite3").touch()
+    code, out, err = run_cli(capsys, project, "check")
+    assert (code, err) == (0, "") and out.startswith("OK: dev is consistent")
+
+
+@pytest.mark.parametrize("operation,target", [("upgrade", "nosuchrev"), ("downgrade", "nosuchrev")])
+def test_failed_mutation_does_not_adopt(project, operation, target):
+    core.revision(project, "initial")
+    path = legacy(project)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        with pytest.raises(errors.TargetError):
+            getattr(core, operation)(project, "dev", target)
+    assert not path.exists()
+    assert not any(issubclass(w.category, errors.EnvironmentAdoptionWarning) for w in caught)
+
+
+def test_drift_failure_does_not_adopt(project):
+    core.revision(project, "initial")
+    core.upgrade(project, "dev")
+    path = legacy(project)
+    db = pm_dir(project) / "states" / "dev.sqlite3"
+    with sqlite3.connect(db) as connection:
+        connection.execute("DELETE FROM prompts")
+    connection.close()
+    with pytest.raises(errors.DriftError):
+        core.upgrade(project, "dev")
+    assert not path.exists()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits")
+@pytest.mark.parametrize("existing_mode", [None, 0o640])
+def test_manifest_rewrite_keeps_permissions(project, existing_mode):
+    path = pm_dir(project) / "environments.json"
+    if existing_mode is None:
+        path.unlink()
+    else:
+        path.chmod(existing_mode)
+    previous = os.umask(0o022)
+    try:
+        core.env_add(project, "qa")
+    finally:
+        os.umask(previous)
+    assert stat.S_IMODE(path.stat().st_mode) == (existing_mode or 0o644)
+
+
+@pytest.mark.parametrize("command", ["check", "get_config"])
+def test_read_only_verification_uses_one_snapshot(project, monkeypatch, command):
+    core.revision(project, "initial")
+    core.upgrade(project, "dev")
+    seen = []
+    for name in ("_applied", "_actual"):
+        real = getattr(core, name)
+
+        def tracked(db, _real=real, _name=name):
+            seen.append((_name, db.in_transaction))
+            return _real(db)
+
+        monkeypatch.setattr(core, name, tracked)
+    if command == "check":
+        core.check(project, "dev")
+    else:
+        core.get_config(project, "dev", "assistant")
+    assert seen == [("_applied", True), ("_actual", True)]
+
+
+def test_cli_label_uses_public_store_api():
+    source = Path(cli.__file__).read_text(encoding="utf-8")
+    assert "store._" not in source and "_environment_label" not in source
+    assert store_api().display_name
+
+
+def test_store_and_core_share_initialization_check(tmp_path):
+    with pytest.raises(errors.InitializationError) as from_core:
+        core.require_init(tmp_path)
+    with pytest.raises(errors.InitializationError) as from_store:
+        store_api().require_init(tmp_path)
+    assert str(from_core.value) == str(from_store.value)
+    assert not hasattr(store_api(), "_root")
