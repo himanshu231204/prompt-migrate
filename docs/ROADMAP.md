@@ -69,7 +69,7 @@
 
 - [ ] Stable protocol compatibility/versioning policy.
 - [ ] Maintainer security disclosure process and supply-chain checks.
-- [ ] Contributor guide, examples for several frameworks.
+- [ ] Contributor guide, examples for several frameworks. (Started early, 2026-11-03: `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, issue and PR templates, and a root `SECURITY.md` pointing to GitHub private vulnerability reporting.)
 - [ ] Published PyPI package and documented upgrade migration policy.
 - [ ] Cross-platform docs and support matrix.
 - [ ] Public comparison and case studies grounded in measured behavior.

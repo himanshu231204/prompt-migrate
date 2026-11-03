@@ -4,6 +4,11 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
 
 ## Unreleased
 
+### Community files
+
+- Added `CONTRIBUTING.md` (setup, rules, a "where does X live" table), `CODE_OF_CONDUCT.md` (Contributor
+  Covenant 2.1), a root `SECURITY.md` (private reporting through GitHub), and issue and pull request templates.
+
 ### Phase 1 cycle 1 — package layout refactor
 
 - `promptmigrate.protocol` is now a package: `limits`, `jsonloader`, `equality` and `rules`. It re-exports every

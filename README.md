@@ -144,10 +144,12 @@ For a real production rollout the future release pipeline must additionally run 
 ## Tests
 
 ```bash
-python -m unittest discover -s tests -v
+python -m pip install -e ".[dev]"
+python -m pytest -q                                      # whole suite: tests/{unit,integration,contract,security}
+PYTHONPATH=src python -m unittest discover -s tests -v   # the original seven starter tests
 ```
 
-Tests cover revision generation, history, separate environment revisions, deterministic rollback, deletion, drift detection, tampered migration files, multiple prompt migrations, and invalid environment paths.
+Tests cover revision generation, history, separate environment revisions, deterministic rollback, deletion, drift detection, tampered migration files, multiple prompt migrations, strict parsing, declared environments, read-only reads and the secret safeguard. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for how to contribute and where each part of the code lives.
 
 ## Safety and integrity guarantees in v0.1
 
