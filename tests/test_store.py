@@ -266,8 +266,8 @@ def test_store_concurrent_additions_preserve_both_declarations(project, monkeypa
         first_read.wait(1)
         return original_write(*args, **kwargs)
 
-    monkeypatch.setattr(api, "read_environments", read)
-    monkeypatch.setattr(api, "_write_environments", write)
+    monkeypatch.setattr(api.environments, "read_environments", read)
+    monkeypatch.setattr(api.environments, "_write_environments", write)
     failures = []
 
     def add(name):
@@ -601,7 +601,7 @@ def test_store_second_writer_waits_for_first_schema_initialization(project, monk
         with original_lock(project_dir):
             yield
 
-    monkeypatch.setattr(api, "_project_lock", observe_second_lock)
+    monkeypatch.setattr(api.lock, "_project_lock", observe_second_lock)
 
     class PausedConnection(sqlite3.Connection):
         def execute(self, sql, *args):

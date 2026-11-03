@@ -4,6 +4,15 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
 
 ## Unreleased
 
+### Phase 1 cycle 1 — package layout refactor
+
+- `promptmigrate.protocol` is now a package: `limits`, `jsonloader`, `equality` and `rules`. It re-exports every
+  previous name. Limits are read at call time from `protocol.limits`, so tests patch them there.
+- `promptmigrate.store` is now a package: `environments`, `lock` and `sqlite`. It re-exports every previous name.
+  `root_dir`/`require_init` live in the new `promptmigrate.project`. Environment-name syntax moved to
+  `protocol.rules.validate_environment_name`.
+- No CLI, file-format or checksum change: CLI output is byte-identical to the previous release.
+
 ### Phase 1 cycle 1 — PR 4: declared environments and read-only state reads
 
 - **Contract:** `init` declares `dev` and `staging` in `.promptmigrate/environments.json`. `env add <name>` adds a declaration atomically; `env list` reports each declared name and whether its local SQLite file exists.

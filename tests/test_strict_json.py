@@ -124,13 +124,13 @@ def test_bom_in_revision_still_accepted(project):
 # --- draft size limit (patched small; the real 1 MiB limit round-trips in test_legacy_warnings) --
 
 def test_draft_at_size_limit_loads(project, monkeypatch):
-    monkeypatch.setattr(protocol, "MAX_DRAFT_BYTES", 200)
+    monkeypatch.setattr(protocol.limits, "MAX_DRAFT_BYTES", 200)
     sized_draft(project, 200)
     assert "assistant" in draft_diff(project)
 
 
 def test_draft_over_size_limit_rejected(project, monkeypatch):
-    monkeypatch.setattr(protocol, "MAX_DRAFT_BYTES", 200)
+    monkeypatch.setattr(protocol.limits, "MAX_DRAFT_BYTES", 200)
     sized_draft(project, 201)
     message = "Invalid JSON draft assistant.json: 201 bytes exceeds the 200-byte limit"
     with pytest.raises(SchemaError, match=re.escape(message)):

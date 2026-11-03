@@ -278,8 +278,8 @@ def revision(project_dir: Path, message: str) -> Revision:
     text = pretty(item)
     # write_text translates "\n" to os.linesep, so this is the exact size of the file it writes.
     size = len(text.replace("\n", os.linesep).encode("utf-8"))
-    if size > protocol.MAX_REVISION_BYTES:
-        raise SchemaError(f"New revision would be {size} bytes; the limit is {protocol.MAX_REVISION_BYTES}")
+    if size > protocol.limits.MAX_REVISION_BYTES:
+        raise SchemaError(f"New revision would be {size} bytes; the limit is {protocol.limits.MAX_REVISION_BYTES}")
     for name, change in changes.items():
         if change["before"] is not None:
             carried = protocol.config_violations(name, change["before"])
