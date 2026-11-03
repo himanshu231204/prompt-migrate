@@ -164,7 +164,7 @@ def install_legacy(project, monkeypatch, name) -> None:
     if name == "large_revision":
         from promptmigrate import protocol
         # Between deep_config (~12 KB) and large_revision (~66 KB), so only large_revision is over the limit.
-        monkeypatch.setattr(protocol, "MAX_REVISION_BYTES", 32768)
+        monkeypatch.setattr(protocol.limits, "MAX_REVISION_BYTES", 32768)
     if name in GENERATED:
         GENERATED[name](project)
     else:

@@ -137,7 +137,7 @@ def test_allowlist_is_parsed_strictly(project):
 
 
 def test_allowlist_over_size_limit_rejected(project, monkeypatch):
-    monkeypatch.setattr(protocol, "MAX_CONTROL_FILE_BYTES", 10)
+    monkeypatch.setattr(protocol.limits, "MAX_CONTROL_FILE_BYTES", 10)
     write_allowlist(project, [])  # '{"allow": []}' is 13 bytes
     message = "Invalid secret allowlist secret-allowlist.json: 13 bytes exceeds the 10-byte limit"
     with pytest.raises(SchemaError, match=re.escape(message)):
