@@ -99,6 +99,18 @@ def test_plan_detects_drift(two, capsys):
     assert (code, out) == (1, "") and err.startswith("Error: Environment drift detected")
 
 
+def test_plan_rejects_unknown_target_before_drift_like_upgrade(two, capsys):
+    core.upgrade(two, "dev")
+    from contextlib import closing
+    import sqlite3
+    with closing(sqlite3.connect(pm_dir(two) / "states" / "dev.sqlite3")) as db:
+        db.execute("UPDATE prompts SET config='{\"messages\":[]}' WHERE name='extra'")
+        db.commit()
+    expected = (1, "", "Error: Unknown target revision: zzz\n")
+    assert run_cli(capsys, two, "upgrade", "zzz", "--env", "dev") == expected
+    assert run_cli(capsys, two, "plan", "--target", "zzz", "--env", "dev") == expected
+
+
 def test_plan_detects_edited_applied_revision(two, capsys):
     core.upgrade(two, "dev", A)
     path = pm_dir(two) / "versions" / f"{A}.json"

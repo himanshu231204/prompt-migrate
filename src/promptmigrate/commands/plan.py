@@ -14,6 +14,8 @@ def plan(project_dir: Path, env: str, target: str = "head") -> MigrationPlan:
     """Resolve `target` against the environment's verified applied state. Writes nothing."""
     env = store.resolve_environment(project_dir, env)
     revisions_ = revisions.load_revisions(project_dir)
+    if target not in ("head", "-1", "base"):
+        planning.upgrade_count(revisions_, target)  # like `upgrade`, reject an unknown id before reading the env
     with store.connect_readonly(project_dir, env) as db:
         applied = apply._verify(db, revisions_) if db is not None else 0
     return planning.build(revisions_, applied, target)
