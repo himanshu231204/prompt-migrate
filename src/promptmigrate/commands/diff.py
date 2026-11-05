@@ -5,9 +5,13 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .. import draftdiff, project
+from .. import draftdiff, output, project
+
+
+def execute(args: argparse.Namespace) -> output.Result:
+    changes, redacted = draftdiff.redacted_diff(Path(args.project))
+    return output.Result("diff", {"changes": changes, "redacted": redacted}, project.pretty(changes) + "\n")
 
 
 def run(args: argparse.Namespace) -> None:
-    changes, _redacted = draftdiff.redacted_diff(Path(args.project))
-    print(project.pretty(changes))
+    output.emit_result(execute(args), "text", [])

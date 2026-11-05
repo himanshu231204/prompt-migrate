@@ -50,7 +50,7 @@ def test_environment_commands_text_output(project, capsys):
 
 
 def test_domain_error_goes_to_stderr_with_exit_1(project, capsys):
-    """Exit code 1 is the pre-PR-6 contract; PR 6 deliberately changes it."""
+    """A missing prompt is a generic handled error: exit 1."""
     run(capsys, project, "revision", "-m", "initial")
     run(capsys, project, "upgrade", "--env", "dev")
     assert run(capsys, project, "get", "nope", "--env", "dev") == (
@@ -58,9 +58,9 @@ def test_domain_error_goes_to_stderr_with_exit_1(project, capsys):
 
 
 def test_invalid_env_name_exit_1(project, capsys):
-    """Exit code 1 is the pre-PR-6 contract; PR 6 deliberately changes it."""
+    """An invalid environment name is a schema error: exit 3."""
     assert run(capsys, project, "check", "--env", "../escape") == (
-        1, "", "Error: Environment must be alphanumeric, starting with a letter\n")
+        3, "", "Error: Environment must be alphanumeric, starting with a letter\n")
 
 
 def test_unknown_subcommand_exits_2(project):

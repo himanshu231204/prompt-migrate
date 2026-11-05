@@ -49,7 +49,7 @@ def test_warnings_print_before_the_error(project, monkeypatch, capsys):
         warnings.warn("careful", LegacyRevisionWarning)
         raise SchemaError("boom")
     monkeypatch.setattr(revisions, "load_revisions", failing)
-    assert run(capsys, project, "history") == (1, "", "Warning: careful\nError: boom\n")
+    assert run(capsys, project, "history") == (3, "", "Warning: careful\nError: boom\n")
 
 
 def test_warnings_print_before_an_unhandled_exception_propagates(project, monkeypatch, capsys):

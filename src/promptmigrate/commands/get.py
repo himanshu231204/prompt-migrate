@@ -8,7 +8,7 @@ import warnings
 from pathlib import Path
 from typing import Any
 
-from .. import apply, project, revisions, secretscan, store
+from .. import apply, output, project, revisions, secretscan, store
 from ..errors import SecretRedactedWarning, TargetError
 
 
@@ -34,6 +34,11 @@ def redacted_config(project_dir: Path, env: str, name: str) -> tuple[dict[str, A
     return config, paths
 
 
+def execute(args: argparse.Namespace) -> output.Result:
+    config, paths = redacted_config(Path(args.project), args.env, args.name)
+    data = {"name": args.name, "config": config, "redacted": paths}
+    return output.Result("get", data, project.pretty(config), args.env)
+
+
 def run(args: argparse.Namespace) -> None:
-    config, _paths = redacted_config(Path(args.project), args.env, args.name)
-    print(project.pretty(config), end="")
+    output.emit_result(execute(args), "text", [])

@@ -10,7 +10,7 @@ import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .. import draftdiff, project, protocol, revisions, secretscan
+from .. import draftdiff, output, project, protocol, revisions, secretscan
 from ..errors import LegacyRevisionWarning, SchemaError, SecretDetectedError, SecretInHistoryWarning
 
 
@@ -63,6 +63,11 @@ def revision(project_dir: Path, message: str) -> revisions.Revision:
     return revisions.load_revisions(project_dir)[-1]
 
 
-def run(args: argparse.Namespace) -> None:
+def execute(args: argparse.Namespace) -> output.Result:
     r = revision(Path(args.project), args.message)
-    print(f"Created {r.revision} (parent: {r.down_revision or 'base'}): {r.path}")
+    data = {"revision": r.revision, "down_revision": r.down_revision, "message": r.message, "path": str(r.path)}
+    return output.Result("revision", data, f"Created {r.revision} (parent: {r.down_revision or 'base'}): {r.path}\n")
+
+
+def run(args: argparse.Namespace) -> None:
+    output.emit_result(execute(args), "text", [])

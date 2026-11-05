@@ -54,12 +54,12 @@ def test_existing_history_secret_audit_preserves_bytes_and_mtimes(project, capsy
     assert snapshot(project) == before
 
 
-@pytest.mark.parametrize("name", ["prdo", "../escape"])
-def test_invalid_environment_check_preserves_bytes_and_mtimes(project, capsys, name):
+@pytest.mark.parametrize("name,expected", [("prdo", 1), ("../escape", 3)])
+def test_invalid_environment_check_preserves_bytes_and_mtimes(project, capsys, name, expected):
     manifest(project, {"dev": {}})
     before = snapshot(project)
     code, out, err = run_cli(capsys, project, "check", "--env", name)
-    assert (code, out) == (1, "") and err.startswith("Error: ")
+    assert (code, out) == (expected, "") and err.startswith("Error: ")
     assert snapshot(project) == before
 
 
@@ -82,7 +82,7 @@ def test_missing_required_table_is_storage_error_without_repair(project, capsys,
     assert snapshot(project) == before
     argv = [command, *(["assistant"] if command == "get" else [])]
     code, out, err = run_cli(capsys, project, *argv)
-    assert code == 1 and out == "" and err.startswith("Error: ")
+    assert code == 5 and out == "" and err.startswith("Error: ")
     assert snapshot(project) == before
 
 
@@ -127,7 +127,7 @@ def test_corrupt_state_reads_are_storage_errors_without_repair(project, capsys, 
         argv.append("assistant")
     argv.extend(["--env", "dev"])
     code, out, err = run_cli(capsys, project, *argv)
-    assert code == 1 and out == "" and err.startswith("Error: ")
+    assert code == 5 and out == "" and err.startswith("Error: ")
     assert snapshot(project) == before
 
 

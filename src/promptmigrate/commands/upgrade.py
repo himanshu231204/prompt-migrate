@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .. import apply, revisions, store
+from .. import apply, output, revisions, store
 from ..errors import TargetError
 
 
@@ -26,8 +26,14 @@ def upgrade(project_dir: Path, env: str, target: str = "head") -> list[str]:
     return targets[applied_count:target_count]
 
 
-def run(args: argparse.Namespace) -> None:
+def execute(args: argparse.Namespace) -> output.Result:
     project_dir = Path(args.project)
     label = store.display_name(project_dir, args.env)
     ids = upgrade(project_dir, args.env, args.target)
-    print(f"{label}: applied {len(ids)} revision(s): {', '.join(ids) or '(already current)'}")
+    data = {"direction": "up", "target": args.target, "revisions": ids}
+    text = f"{label}: applied {len(ids)} revision(s): {', '.join(ids) or '(already current)'}\n"
+    return output.Result("upgrade", data, text, label)
+
+
+def run(args: argparse.Namespace) -> None:
+    output.emit_result(execute(args), "text", [])

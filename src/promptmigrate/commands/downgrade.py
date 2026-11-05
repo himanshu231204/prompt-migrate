@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .. import apply, revisions, store
+from .. import apply, output, revisions, store
 from ..errors import TargetError
 
 
@@ -32,8 +32,14 @@ def downgrade(project_dir: Path, env: str, target: str = "-1") -> list[str]:
     return [r.revision for r in reversed_revisions]
 
 
-def run(args: argparse.Namespace) -> None:
+def execute(args: argparse.Namespace) -> output.Result:
     project_dir = Path(args.project)
     label = store.display_name(project_dir, args.env)
     ids = downgrade(project_dir, args.env, args.target)
-    print(f"{label}: reverted {len(ids)} revision(s): {', '.join(ids) or '(nothing to revert)'}")
+    data = {"direction": "down", "target": args.target, "revisions": ids}
+    text = f"{label}: reverted {len(ids)} revision(s): {', '.join(ids) or '(nothing to revert)'}\n"
+    return output.Result("downgrade", data, text, label)
+
+
+def run(args: argparse.Namespace) -> None:
+    output.emit_result(execute(args), "text", [])

@@ -6,7 +6,7 @@ import argparse
 import warnings
 from pathlib import Path
 
-from .. import apply, project, revisions, secretscan, store
+from .. import apply, output, project, revisions, secretscan, store
 from ..errors import PendingRevisionsError, SchemaError, SecretInHistoryWarning, StaleAllowlistWarning
 
 
@@ -50,9 +50,14 @@ def audit_secrets(project_dir: Path) -> None:
                           "or history", StaleAllowlistWarning, stacklevel=2)
 
 
-def run(args: argparse.Namespace) -> None:
+def execute(args: argparse.Namespace) -> output.Result:
     project_dir = Path(args.project)
     label = store.display_name(project_dir, args.env)
     audit_secrets(project_dir)
     n, total = check(project_dir, args.env, args.require_head)
-    print(f"OK: {label} is consistent ({n}/{total} revisions applied)")
+    data = {"consistent": True, "applied": n, "total": total}
+    return output.Result("check", data, f"OK: {label} is consistent ({n}/{total} revisions applied)\n", label)
+
+
+def run(args: argparse.Namespace) -> None:
+    output.emit_result(execute(args), "text", [])

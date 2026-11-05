@@ -81,7 +81,7 @@ def test_stored_data_is_not_redacted(leaked):
 def test_blocked_revision_never_prints_the_value(project, capsys):
     set_draft(project, "assistant", {**CFG, "note": TOKEN})
     code, out, err = run(capsys, project, "revision", "-m", "leak")
-    assert code == 1  # exit code 3 is asserted from PR 6
+    assert code == 3
     assert TOKEN not in out + err
     assert err.startswith("Error: Secret-like values in new revision content: assistant /note openai-anthropic-key.")
 
