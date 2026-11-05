@@ -29,7 +29,7 @@
 - [x] Declared environments; read commands never write (`store/`, `env add`, `env list`).
 - [x] Refactor core into testable modules incrementally, without breaking the CLI (ADR-022; `core.py` is a re-export facade).
 - [ ] Read-only `plan` with a property-based plan==apply test.
-- [ ] Typed errors, exit codes 0–5, `--output json`. (Typed error classes are done in `errors.py`; the CLI still exits 0/1, and `--output json` is pending.)
+- [x] Typed errors, exit codes 0–5, `--output json` (`output.py`; schema `promptmigrate.output/1`; ADR-023).
 
 ### Remaining after cycle 1 (cycle 2+)
 

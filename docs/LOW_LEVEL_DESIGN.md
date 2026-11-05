@@ -15,13 +15,14 @@ src/promptmigrate/
   store/             environments (manifest, adoption), lock, sqlite (ro/rw)     layer 4
   draftdiff.py       drafts vs replayed source head, redacted diff               layer 5
   apply.py           verify ledger/rows against history; write revisions         layer 5
-  commands/          one module per CLI verb: use-case function + run(args)      layer 6
+  output.py          Result, text/JSON rendering, error -> exit code table       layer 5
+  commands/          one module per CLI verb: use-case function + execute(args)  layer 6
   cli.py             argparse, dispatch, warning capture, error printing         layer 7
   core.py            public facade: re-exports only
 ```
 
 Reserved for upcoming work: `plan.py` (PR 5, pure target resolution, used by `commands/upgrade.py` and
-`commands/downgrade.py`) and `output.py` (PR 6, text/JSON rendering and exit codes). Later phases add their own
+`commands/downgrade.py`). `output.py` (PR 6, done) renders text/JSON and owns the error-to-exit-code table. Later phases add their own
 modules (evaluation gates, release activation, provider adapters) instead of growing existing ones.
 
 Keep the public command behavior stable during refactor. Refactor in tested increments rather than recreating implementation from scratch.

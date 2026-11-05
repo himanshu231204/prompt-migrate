@@ -27,7 +27,7 @@ GitHub Actions runs the complete suite inside Linux Docker containers, and nativ
 `macos-latest`, for Python 3.10, 3.12 and 3.13. The native jobs cover the store's Windows-only paths and macOS's
 case-insensitive filesystem. Python 3.11 remains covered by the local Windows merge gate (`AGENTS.md`).
 
-Tests currently cover: initial revision and two environments; downgrade; checksum tampering; local drift; bad before-state preconditions; deletion/recovery; invalid environment name; no-op revision; multi-prompt revision/rollback. Phase 1 cycle 1 PR 2 added characterization tests (revision-graph errors, upgrade/downgrade targets, CLI text output and exit codes, the README example), five strict xfails for known bugs, and eight legacy-history compatibility fixtures. PR 3 added error-type, strict-parsing, canonical-equality, new-content, legacy-warning and CLI-warning tests, and removed three of the five xfails. PR 3b added secret-rule unit tests (built from runtime fragments, never literals), revision blocking, output redaction, history and stale-allowlist warnings. PR 4 adds declared-environment schema/adoption, canonical resolution, atomic manifest replacement, read-only SQLite contracts, malformed/missing storage, connection lifecycle, concurrent manifest and initial DB setup, and CLI output/warning coverage. Windows symlink and case-collision paths skip on this host and remain unverified here. This is **proof of a local prototype**, not extensive production verification.
+Tests currently cover: initial revision and two environments; downgrade; checksum tampering; local drift; bad before-state preconditions; deletion/recovery; invalid environment name; no-op revision; multi-prompt revision/rollback. Phase 1 cycle 1 PR 2 added characterization tests (revision-graph errors, upgrade/downgrade targets, CLI text output and exit codes, the README example), five strict xfails for known bugs, and eight legacy-history compatibility fixtures. PR 3 added error-type, strict-parsing, canonical-equality, new-content, legacy-warning and CLI-warning tests, and removed three of the five xfails. PR 3b added secret-rule unit tests (built from runtime fragments, never literals), revision blocking, output redaction, history and stale-allowlist warnings. PR 4 adds declared-environment schema/adoption, canonical resolution, atomic manifest replacement, read-only SQLite contracts, malformed/missing storage, connection lifecycle, concurrent manifest and initial DB setup, and CLI output/warning coverage. Windows symlink and case-collision paths skip on this host and remain unverified here. PR 6 adds the exit-code table and JSON envelope contract tests. This is **proof of a local prototype**, not extensive production verification.
 
 ## Where tests live
 
@@ -79,7 +79,8 @@ Basenames stay unique across directories, because pytest's default `prepend` imp
 - `--help`, invalid argument/target, exit codes, stdout/stderr.
 - Commands reflect README examples exactly.
 - `diff`, `history`, `plan` (when added) do not modify state.
-- JSON output stable once published.
+- JSON output stable once published (`test_json_output.py`: one envelope per command, errors, warnings list, redaction).
+- Exit codes 0–5 (`test_exit_codes.py`: error class → code table, every `MigrationError` subclass covered, one end-to-end case per code, warnings never change the code).
 
 ### E. Security and limits
 
