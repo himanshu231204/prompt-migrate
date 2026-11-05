@@ -69,7 +69,7 @@
 
 - [ ] Stable protocol compatibility/versioning policy.
 - [ ] Maintainer security disclosure process and supply-chain checks.
-- [ ] Contributor guide, examples for several frameworks. (Started early, 2026-11-03: `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, issue and PR templates, and a root `SECURITY.md` pointing to GitHub private vulnerability reporting.)
+- [ ] Contributor guide, examples for several frameworks. (Started early, 2026-11-03: `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, issue and PR templates, and a root `SECURITY.md` pointing to GitHub private vulnerability reporting. 2026-11-05: `AGENTS.md` holds every rule for AI coding agents, including updating this file and `CHANGELOG.md` on each commit.)
 - [ ] Published PyPI package and documented upgrade migration policy.
 - [ ] Cross-platform docs and support matrix.
 - [ ] Public comparison and case studies grounded in measured behavior.
