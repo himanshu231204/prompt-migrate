@@ -78,7 +78,7 @@ def test_warnings_print_before_a_check_error(project, capsys):
     with closing(sqlite3.connect(pm_dir(project) / "states" / "dev.sqlite3")) as conn, conn:
         conn.execute("UPDATE prompts SET config='{}' WHERE name='assistant'")
     assert run(capsys, project, "check") == (
-        1, "", f"Warning: {HISTORY}\nError: Environment drift detected for prompts: assistant\n")
+        4, "", f"Warning: {HISTORY}\nError: Environment drift detected for prompts: assistant\n")
 
 
 def test_current_does_not_audit(project, capsys):

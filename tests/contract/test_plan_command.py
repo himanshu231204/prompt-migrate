@@ -96,7 +96,7 @@ def test_plan_detects_drift(two, capsys):
         db.execute("UPDATE prompts SET config='{\"messages\":[]}' WHERE name='extra'")
         db.commit()
     code, out, err = run_cli(capsys, two, "plan", "--env", "dev")
-    assert (code, out) == (1, "") and err.startswith("Error: Environment drift detected")
+    assert (code, out) == (4, "") and err.startswith("Error: Environment drift detected")
 
 
 def test_plan_rejects_unknown_target_before_drift_like_upgrade(two, capsys):
@@ -116,7 +116,7 @@ def test_plan_detects_edited_applied_revision(two, capsys):
     path = pm_dir(two) / "versions" / f"{A}.json"
     path.write_text(path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
     code, _, err = run_cli(capsys, two, "plan", "--env", "dev")
-    assert code == 1 and "Migration file was modified after apply" in err
+    assert code == 4 and "Migration file was modified after apply" in err
 
 
 def test_plan_not_initialized(tmp_path, capsys):

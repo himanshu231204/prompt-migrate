@@ -6,7 +6,7 @@ import argparse
 import json
 from pathlib import Path
 
-from .. import project
+from .. import output, project
 from ..errors import InitializationError
 
 
@@ -32,5 +32,12 @@ def init(project_dir: Path) -> Path:
     return root
 
 
+def execute(args: argparse.Namespace) -> output.Result:
+    """Run `init` and return its text and JSON result."""
+    root = init(Path(args.project))
+    return output.Result("init", {"path": str(root)}, f"Initialized {root}\n")
+
+
 def run(args: argparse.Namespace) -> None:
-    print(f"Initialized {init(Path(args.project))}")
+    """Run `init` and print its text output."""
+    output.emit_result(execute(args), "text", [])

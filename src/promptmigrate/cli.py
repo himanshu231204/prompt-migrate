@@ -4,8 +4,9 @@ import argparse
 import sqlite3
 import sys
 import warnings
+from . import output
 from .commands import check, current, diff, downgrade, env, get, history, init, plan, revision, upgrade
-from .errors import MigrationError, PromptMigrateWarning
+from .errors import PromptMigrateWarning
 
 COMMANDS = {
     "init": init, "revision": revision, "history": history, "diff": diff, "current": current,
@@ -14,8 +15,10 @@ COMMANDS = {
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """The argument parser: global flags, then one subparser per command."""
     p = argparse.ArgumentParser(prog="promptmigrate", description="Alembic-style prompt configuration migrations")
     p.add_argument("--project", default=".", help="Project directory, default: current directory")
+    p.add_argument("--output", choices=output.FORMATS, default="text", help="Output format, default: text")
     sub = p.add_subparsers(dest="command", required=True)
     sub.add_parser("init", help="Create .promptmigrate/ scaffold")
     rev = sub.add_parser("revision", help="Generate a migration from draft changes")
@@ -48,26 +51,36 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Parse, run the command, render the result or handled error, and return the exit code."""
     args = build_parser().parse_args(argv)
-    error = None
-    unhandled = None
+    result = error = unhandled = None
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         try:
-            _run(args)
-        except (MigrationError, OSError, sqlite3.Error) as e:
+            result = COMMANDS[args.command].execute(args)
+        except output.HANDLED as e:
             error = e
         except BaseException as e:
             # Printing here, while warnings.showwarning is still catch_warnings' own recorder, would make
             # _print_warnings append back onto `caught` while iterating it. Defer to after the `with` exits
             # (which restores showwarning), but still before this propagates.
             unhandled = e
-    _print_warnings(caught)
+    if args.output == "json" and unhandled is None:
+        for w in caught:  # JSON lists PromptMigrate warnings itself; anything else still goes to stderr
+            if not issubclass(w.category, PromptMigrateWarning):
+                warnings.showwarning(w.message, w.category, w.filename, w.lineno)
+    else:  # text mode, or a crash that leaves no envelope to list them in
+        _print_warnings(caught)
     if unhandled is not None:
         raise unhandled
-    if error is not None:
-        print(f"Error: {error}", file=sys.stderr)
-        return 1
+    warned = output.collect_warnings(caught)
+    try:
+        if error is not None:
+            return output.emit_error(error, args.output, *output.describe(args), warned)
+        output.emit_result(result, args.output, warned)
+    except OSError as e:  # writing the result failed: a closed pipe or a full destination
+        print(f"Error: {e}", file=sys.stderr)
+        return 5
     return 0
 
 
@@ -82,10 +95,6 @@ def _print_warnings(caught: list[warnings.WarningMessage]) -> None:
         if key not in seen:
             seen.add(key)
             print(f"Warning: {w.message}", file=sys.stderr)
-
-
-def _run(args: argparse.Namespace) -> None:
-    COMMANDS[args.command].run(args)
 
 
 if __name__ == "__main__":

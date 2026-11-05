@@ -307,14 +307,14 @@ def test_cli_environment_labels_use_canonical_spelling(project, capsys):
 def test_cli_invalid_environment_syntax_precedes_manifest_parsing(project, capsys, command):
     (pm_dir(project) / "environments.json").write_text("{", encoding="utf-8")
     code, out, err = run_cli(capsys, project, command, "--env", "../escape")
-    assert code == 1 and out == "" and err == f"Error: {SYNTAX_MESSAGE}\n"
+    assert code == 3 and out == "" and err == f"Error: {SYNTAX_MESSAGE}\n"
 
 
 @pytest.mark.parametrize("name", ["DEV", "../escape"])
 def test_cli_env_add_errors(project, capsys, name):
     manifest(project, {"dev": {}})
     code, out, err = run_cli(capsys, project, "env", "add", name)
-    assert code == 1 and out == "" and err.startswith("Error: ")
+    assert code == 3 and out == "" and err.startswith("Error: ")
     if name == "../escape":
         assert err == f"Error: {SYNTAX_MESSAGE}\n"
 

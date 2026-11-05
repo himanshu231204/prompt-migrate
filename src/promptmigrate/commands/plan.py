@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .. import apply, revisions, store
+from .. import apply, output, revisions, store
 from .. import plan as planning
 from ..plan import MigrationPlan
 
@@ -33,8 +33,19 @@ def render(label: str, result: MigrationPlan) -> str:
     return "\n".join(lines) + "\n"
 
 
-def run(args: argparse.Namespace) -> None:
-    """Print the plan for `args.env` and `args.target`."""
+def execute(args: argparse.Namespace) -> output.Result:
+    """Run `plan` and return its text and JSON result."""
     project_dir = Path(args.project)
     label = store.display_name(project_dir, args.env)
-    print(render(label, plan(project_dir, args.env, args.target)), end="")
+    result = plan(project_dir, args.env, args.target)
+    data = {
+        "direction": result.direction, "start": result.start, "target": result.target,
+        "steps": [{"revision": step.revision, "changes": [{"name": name, "kind": kind} for name, kind in step.changes]}
+                  for step in result.steps],
+    }
+    return output.Result("plan", data, render(label, result), label)
+
+
+def run(args: argparse.Namespace) -> None:
+    """Print the plan for `args.env` and `args.target`."""
+    output.emit_result(execute(args), "text", [])

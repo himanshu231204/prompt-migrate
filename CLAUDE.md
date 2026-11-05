@@ -10,7 +10,7 @@ Workflow, TDD rules, hard rules and the review report format are in [`AGENTS.md`
 
 ## Status
 
-- Implemented: `init`, `revision`, `history`, `diff`, `current`, `upgrade`, `downgrade`, `plan`, `check`, `get`, `env add`, `env list`.
+- Implemented: exit codes 0–5 and `--output json`; commands `init`, `revision`, `history`, `diff`, `current`, `upgrade`, `downgrade`, `plan`, `check`, `get`, `env add`, `env list`.
 - Current scope: Phase 1, cycle 1, in `docs/ROADMAP.md`.
 - `docs/` also describes future modules and commands (`eval`, `export`, Postgres, SDK, …). They don't exist yet.
 - Test baseline: after the package layout refactor, Windows 11 / Python 3.11.9 reports `620 passed, 18 skipped, 33 warnings`; the original seven unittest tests pass. Skips include symlink and case-collision cases unavailable on this host. Linux/macOS are claimed only after a remote CI run.
@@ -35,7 +35,7 @@ PYTHONPATH=src python -m promptmigrate --project <dir> history   # CLI from sour
 
 ## Architecture
 
-Logic is split by concept (ADR-022; layer order in `docs/LOW_LEVEL_DESIGN.md` §1): `protocol/` (limits, strict JSON loading, `canonical`/`same`, config and environment-name rules), `secretscan.py` (heuristic secret rules, fingerprinted allowlist, redaction; no I/O), `project.py` (workspace, drafts, allowlist), `revisions.py` (revision parsing, graph, replay), `draftdiff.py`, `store/` (declared environments, project lock, SQLite read/write connections), `apply.py` (`_verify` and the row+ledger writes), `commands/<verb>.py` (each verb's function plus `run(args)` printing its text output) and `errors.py`. `core.py` re-exports the public API and defines nothing. `cli.py` only parses and dispatches: it prints any `MigrationError`, `OSError` or `sqlite3.Error` as `Error: …` on stderr and exits 1. It prints captured PromptMigrate warnings once each as `Warning: …` on stderr.
+Logic is split by concept (ADR-022; layer order in `docs/LOW_LEVEL_DESIGN.md` §1): `protocol/` (limits, strict JSON loading, `canonical`/`same`, config and environment-name rules), `secretscan.py` (heuristic secret rules, fingerprinted allowlist, redaction; no I/O), `project.py` (workspace, drafts, allowlist), `revisions.py` (revision parsing, graph, replay), `draftdiff.py`, `store/` (declared environments, project lock, SQLite read/write connections), `apply.py` (`_verify` and the row+ledger writes), `output.py` (`Result`, text/JSON rendering, the error-to-exit-code table; ADR-024), `commands/<verb>.py` (each verb's function plus `execute(args)` returning an `output.Result`) and `errors.py`. `core.py` re-exports the public API and defines nothing. `cli.py` only parses and dispatches: it renders any `MigrationError`, `OSError` or `sqlite3.Error` through `output.py` (`Error: …` on stderr and exit 1/3/4/5 by type; with `--output json`, an envelope on stdout). It prints captured PromptMigrate warnings once each as `Warning: …` on stderr, or lists them in the JSON envelope.
 
 **Four states, kept distinct:**
 1. **Drafts:** `.promptmigrate/drafts/<name>.json`, the desired config (one JSON object per name).

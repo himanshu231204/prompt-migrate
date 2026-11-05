@@ -18,7 +18,7 @@ Familiar to Alembic users, transparent in CI, safe by default. Commands distingu
 | `promptmigrate downgrade -1 --env dev` | Revert one revision | Default downgrade behavior |
 | `promptmigrate downgrade base --env dev` | Revert all | Restores empty source state |
 | `promptmigrate downgrade <revision> --env dev` | Revert to exact revision | Must be behind/equal to current |
-| `promptmigrate plan --env dev [--target head]` | Preview what `upgrade`/`downgrade` would do | Read-only: verifies the environment like `check`, writes nothing (no state file, no manifest adoption, no lock). Target is `head` (default), `-1`, `base` or a revision id; the direction is inferred from where the target lies. Lists each revision and its config changes (`create`/`update`/`delete`); prints `nothing to do` at the target. Same `Error:` text for unknown targets, drift and tampering as the commands it previews. Text output only until `--output json` |
+| `promptmigrate plan --env dev [--target head]` | Preview what `upgrade`/`downgrade` would do | Read-only: verifies the environment like `check`, writes nothing (no state file, no manifest adoption, no lock). Target is `head` (default), `-1`, `base` or a revision id; the direction is inferred from where the target lies. Lists each revision and its config changes (`create`/`update`/`delete`); prints `nothing to do` at the target. Same `Error:` text for unknown targets, drift and tampering as the commands it previews. |
 | `promptmigrate check --env dev` | Check applied integrity/state drift | Does not require env at source head; warns about secrets in history and stale allowlist entries |
 | `promptmigrate check --env dev --require-head` | Also require no pending revisions | Helpful for CI |
 | `promptmigrate get sql_agent --env dev` | Read applied local JSON | Only local stored config; secret-like values shown as <redacted:RULE> |
@@ -31,7 +31,7 @@ Existing projects without a manifest are read in memory as `dev`, `staging` and 
 
 `check`, `current`, `get`, and `env list` are read-only. They do not create missing state databases. An absent database represents the empty base state; an existing database missing either required table or using WAL journal mode is a storage error and is never repaired by a read. CLI status labels use canonical manifest spelling. `upgrade` and `downgrade` use local SQLite transactions. Production-like names (`prod`, `production`, `live`) emit a warning: these names still refer only to local SQLite files.
 
-**Global flag:** `promptmigrate --project /path/to/project <command>`.
+**Global flags:** `promptmigrate --project /path/to/project --output {text,json} <command>`. `--output` defaults to `text`.
 
 ## Developer example
 
@@ -58,7 +58,6 @@ promptmigrate downgrade -1 --env staging
 | Command | Contract |
 |---|---|
 | `validate` | Validate all source/drafts against strict schema and revisions |
-| `--output json` | Machine-readable output for every command (design syntax TBD) |
 | `eval --suite regression` | Run evaluation policy against candidate configuration |
 | `export --env dev` | Emit immutable artifact for a runtime/CI consumer |
 | `promote --from staging --to production` | Activate approved immutable release (future shared control plane) |
@@ -67,17 +66,70 @@ promptmigrate downgrade -1 --env staging
 
 ## Errors and exit status
 
-**Current baseline:** `0` on success, `1` for handled domain/storage errors. Argument parsing follows `argparse` behavior
-(typically `2` for usage failures). Handled errors are typed (`SchemaError`, `RevisionGraphError`,
-`MigrationConflictError`, `DriftError`, `IntegrityError`, `TargetError`, `PendingRevisionsError`, `InitializationError`,
-all subclasses of `MigrationError`); the detailed exit-code mapping arrives with the JSON contract.
+Handled errors are typed (`errors.py`); `output.py` maps them to the exit status:
+
+| Exit | Meaning | Error types |
+|---|---|---|
+| `0` | success | — |
+| `1` | generic handled error | `InitializationError`, `EnvironmentNotDeclaredError`, `TargetError`, `PendingRevisionsError`, any other `MigrationError` |
+| `2` | usage error | `argparse` (bad flag, unknown command, bad `--output`) |
+| `3` | invalid source or schema | `SchemaError`, `SecretDetectedError`, `RevisionGraphError` |
+| `4` | drift or integrity conflict | `DriftError`, `IntegrityError`, `MigrationConflictError` |
+| `5` | lock or storage problem | `StorageError`, `sqlite3.Error`, `OSError` |
+
+`6` (evaluation gate) and `7` (provider error) are reserved and not emitted: no command can produce them yet. Code `1`
+keeps its pre-existing meaning, so scripts that only test for non-zero keep working. An unhandled exception still
+propagates as a Python traceback.
 
 **Warnings:** each distinct warning is printed once per invocation to stderr as `Warning: <message>`, before any
 `Error: …` line. Warnings never change the exit code. Warnings come from existing revision files that break a tier-B
 rule (see `MIGRATION_PROTOCOL.md`, "Strict parsing and compatibility tiers") and from the secret safeguard (redaction,
 secrets in history, stale allowlist entries; see `SECURITY.md`).
 
-**Proposed taxonomy:** `0` success, `2` usage, `3` invalid source/schema, `4` drift/integrity conflict, `5` lock/storage problem, `6` evaluation gate failure, `7` provider error. Introduce only after contract tests and documentation update.
+## JSON output
+
+`--output json` prints exactly one JSON object and a newline on stdout (`ensure_ascii`, no NaN), for success and for
+handled errors alike. Schema `promptmigrate.output/1`:
+
+```json
+{"schema": "promptmigrate.output/1", "ok": true, "command": "upgrade", "env": "dev",
+ "data": {}, "warnings": [{"category": "LegacyRevisionWarning", "message": "…"}]}
+```
+
+```json
+{"schema": "promptmigrate.output/1", "ok": false, "command": "check", "env": "dev",
+ "error": {"code": "conflict", "exit_code": 4, "message": "…"}, "warnings": []}
+```
+
+- `command` is the verb (`env add`, `env list` for the subcommands). `env` is the environment label, or `null` for
+  commands without one.
+- `error.code` is `error` (exit 1), `schema` (3), `conflict` (4) or `storage` (5). The message is the same text as the
+  `Error: …` line of text mode. Error envelopes have no `data`; success envelopes have no `error`.
+- `warnings` lists each distinct PromptMigrate warning once, in first-seen order. In JSON mode PromptMigrate warnings
+  and handled errors are not printed to stderr. Warnings from other libraries still go to stderr, so a script that needs
+  a clean stderr must not assume it is empty. Warnings never change the exit status. An unhandled exception leaves no
+  envelope, so its PromptMigrate warnings are printed to stderr as in text mode, before the traceback.
+- Usage errors (exit 2) are argparse text on stderr, not an envelope: parsing fails before the format is known.
+- Secret-like values are redacted exactly as in text mode; `redacted` lists what was redacted.
+- Within `promptmigrate.output/1`, fields are only added, never removed or retyped.
+
+`data` by command:
+
+| Command | `data` |
+|---|---|
+| `init` | `path` |
+| `revision` | `revision`, `down_revision`, `message`, `path` |
+| `history` | `revisions[]` (`revision`, `down_revision`, `message`), `redacted` (revision ids with a redacted message) |
+| `diff` | `changes` (name → `{before, after}`, redacted), `redacted[]` |
+| `current` | `revision` (`null` at base), `applied`, `total` |
+| `upgrade` / `downgrade` | `direction` (`up`/`down`), `target`, `revisions[]` (ids applied or reverted, in order) |
+| `plan` | `direction` (`upgrade`/`downgrade`/`none`), `start`, `target` (ids, `null` at base), `steps[]` (`revision`, `changes[]` of `name`, `kind`: `create`/`update`/`delete`/`unchanged`), in the order they would run |
+| `check` | `consistent` (always `true`; inconsistency is an error), `applied`, `total` |
+| `get` | `name`, `config` (redacted), `redacted[]` |
+| `env add` | `name` |
+| `env list` | `environments[]` (`name`, `has_state`) |
+
+A new command adds an `execute(args) -> output.Result` and gets both formats and the error mapping from `output.py`.
 
 ## Output policy
 

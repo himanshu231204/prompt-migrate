@@ -74,7 +74,7 @@ PUBLIC = sorted(name for names in CORE_NAMES.values() for name in names if not n
 # core, __init__ and __main__ are re-export or entry layers and are not ranked.
 LAYERS = {
     "errors": 0, "protocol": 1, "secretscan": 2, "project": 3, "revisions": 4, "store": 4,
-    "draftdiff": 5, "apply": 5, "commands": 6, "cli": 7,
+    "draftdiff": 5, "apply": 5, "output": 5, "commands": 6, "cli": 7,
 }
 SRC = Path(importlib.import_module("promptmigrate").__file__).resolve().parent
 
