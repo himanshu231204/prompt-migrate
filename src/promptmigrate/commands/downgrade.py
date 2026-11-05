@@ -5,28 +5,17 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .. import apply, revisions, store
-from ..errors import TargetError
+from .. import apply, plan, revisions, store
 
 
 def downgrade(project_dir: Path, env: str, target: str = "-1") -> list[str]:
     env = store.resolve_environment(project_dir, env)
     revisions_ = revisions.load_revisions(project_dir)
-    targets = [r.revision for r in revisions_]
     with store.connect_write(project_dir, env) as db:
         db.execute("BEGIN IMMEDIATE")
         applied_count = apply._verify(db, revisions_)
-        if target == "-1":
-            target_count = max(0, applied_count - 1)
-        elif target == "base":
-            target_count = 0
-        elif target in targets:
-            target_count = targets.index(target) + 1
-        else:
-            raise TargetError(f"Unknown target revision: {target}")
-        if target_count > applied_count:
-            raise TargetError("Downgrade target is ahead of current revision; use upgrade")
-        reversed_revisions = list(reversed(revisions_[target_count:applied_count]))
+        target_count = plan.downgrade_count(revisions_, applied_count, target)
+        reversed_revisions = plan.downgrade_steps(revisions_, applied_count, target_count)
         apply.migrate(db, reversed_revisions, backward=True)
     store.adopt_environments(project_dir)
     return [r.revision for r in reversed_revisions]

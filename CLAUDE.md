@@ -10,9 +10,9 @@ Workflow, TDD rules, hard rules and the review report format are in [`AGENTS.md`
 
 ## Status
 
-- Implemented: `init`, `revision`, `history`, `diff`, `current`, `upgrade`, `downgrade`, `check`, `get`, `env add`, `env list`.
+- Implemented: `init`, `revision`, `history`, `diff`, `current`, `upgrade`, `downgrade`, `plan`, `check`, `get`, `env add`, `env list`.
 - Current scope: Phase 1, cycle 1, in `docs/ROADMAP.md`.
-- `docs/` also describes future modules and commands (`plan`, `eval`, `export`, Postgres, SDK, …). They don't exist yet.
+- `docs/` also describes future modules and commands (`eval`, `export`, Postgres, SDK, …). They don't exist yet.
 - Test baseline: after the package layout refactor, Windows 11 / Python 3.11.9 reports `620 passed, 18 skipped, 33 warnings`; the original seven unittest tests pass. Skips include symlink and case-collision cases unavailable on this host. Linux/macOS are claimed only after a remote CI run.
 
 ## Commands

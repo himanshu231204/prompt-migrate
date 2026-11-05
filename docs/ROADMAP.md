@@ -28,7 +28,7 @@
 - [x] Heuristic secret safeguard: `revision` blocks, `diff`/`get` redact, reviewed allowlist (`secretscan.py`).
 - [x] Declared environments; read commands never write (`store/`, `env add`, `env list`).
 - [x] Refactor core into testable modules incrementally, without breaking the CLI (ADR-022; `core.py` is a re-export facade).
-- [ ] Read-only `plan` with a property-based plan==apply test.
+- [x] Read-only `plan` with a property-based plan==apply test (`plan.py`, `commands/plan.py`).
 - [ ] Typed errors, exit codes 0–5, `--output json`. (Typed error classes are done in `errors.py`; the CLI still exits 0/1, and `--output json` is pending.)
 
 ### Remaining after cycle 1 (cycle 2+)
@@ -80,4 +80,4 @@ No SaaS dashboard, no visual prompt editor, no paid cloud control plane, no dire
 
 ## First next step
 
-Finish Phase 1 cycle 1: the read-only `plan` command, then exit codes 0–5 and `--output json`. Use [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) and [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md), and keep to small tested PRs.
+Finish Phase 1 cycle 1: exit codes 0–5 and `--output json` (the read-only `plan` command is done). Use [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) and [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md), and keep to small tested PRs.
