@@ -62,6 +62,17 @@ def test_warnings_print_before_an_unhandled_exception_propagates(project, monkey
     assert capsys.readouterr().err == "Warning: careful\n"
 
 
+def test_json_mode_prints_warnings_before_an_unhandled_exception_propagates(project, monkeypatch, capsys):
+    def failing(_project):
+        warnings.warn("careful", LegacyRevisionWarning)
+        warnings.warn("careful", LegacyRevisionWarning)
+        raise RuntimeError("boom")
+    monkeypatch.setattr(revisions, "load_revisions", failing)
+    with pytest.raises(RuntimeError):
+        cli.main(["--project", str(project), "--output", "json", "history"])
+    assert capsys.readouterr() == ("", "Warning: careful\n")  # no envelope to list them in, so stderr
+
+
 def test_other_warnings_pass_through_unprinted(project, monkeypatch, capsys):
     shown = []
     monkeypatch.setattr(warnings, "showwarning", lambda message, category, *args, **kwargs: shown.append(category))

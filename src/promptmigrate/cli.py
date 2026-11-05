@@ -65,12 +65,11 @@ def main(argv: list[str] | None = None) -> int:
             # _print_warnings append back onto `caught` while iterating it. Defer to after the `with` exits
             # (which restores showwarning), but still before this propagates.
             unhandled = e
-    as_json = args.output == "json"
-    if as_json:
+    if args.output == "json" and unhandled is None:
         for w in caught:  # JSON lists PromptMigrate warnings itself; anything else still goes to stderr
             if not issubclass(w.category, PromptMigrateWarning):
                 warnings.showwarning(w.message, w.category, w.filename, w.lineno)
-    else:
+    else:  # text mode, or a crash that leaves no envelope to list them in
         _print_warnings(caught)
     if unhandled is not None:
         raise unhandled
