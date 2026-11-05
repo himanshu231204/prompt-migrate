@@ -4,6 +4,14 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
 
 ## Unreleased
 
+### Phase 1 cycle 1 — read-only `plan`
+
+- Added `promptmigrate plan [--env E] [--target head|-1|base|<revision>]`: a read-only preview of what `upgrade` or
+  `downgrade` would do. It verifies the environment like `check`, writes nothing and infers the direction from the
+  target. **Contract:** new command; no change to existing commands, output or error messages.
+- Target resolution moved into the pure `promptmigrate.plan` module, shared by `upgrade`, `downgrade` and `plan`.
+  A hypothesis property test checks that `plan` matches what the commands apply (ADR-023).
+
 ### Community files
 
 - Added `examples/multi-agent-basic/`: two agent drafts and a cross-platform `run.py` that walks the full lifecycle.
