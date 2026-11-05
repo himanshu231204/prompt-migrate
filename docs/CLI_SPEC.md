@@ -105,9 +105,9 @@ handled errors alike. Schema `promptmigrate.output/1`:
   commands without one.
 - `error.code` is `error` (exit 1), `schema` (3), `conflict` (4) or `storage` (5). The message is the same text as the
   `Error: …` line of text mode. Error envelopes have no `data`; success envelopes have no `error`.
-- `warnings` lists each distinct PromptMigrate warning once, in first-seen order. In JSON mode they are not printed
-  to stderr, and stderr stays empty. Warnings never change the exit status. Warnings from other libraries still go to
-  stderr.
+- `warnings` lists each distinct PromptMigrate warning once, in first-seen order. In JSON mode PromptMigrate warnings
+  and handled errors are not printed to stderr. Warnings from other libraries still go to stderr, so a script that needs
+  a clean stderr must not assume it is empty. Warnings never change the exit status.
 - Usage errors (exit 2) are argparse text on stderr, not an envelope: parsing fails before the format is known.
 - Secret-like values are redacted exactly as in text mode; `redacted` lists what was redacted.
 - Within `promptmigrate.output/1`, fields are only added, never removed or retyped.
