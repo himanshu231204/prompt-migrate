@@ -4,6 +4,16 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
 
 ## Unreleased
 
+### Phase 1 cycle 1 — exit codes and `--output json` (PR 6)
+
+- **Contract:** handled errors now exit by type: 3 for schema/source errors, 4 for drift, integrity and conflicts, 5
+  for storage, `sqlite3` and `OSError` failures. Other handled errors (uninitialized project, undeclared environment,
+  unknown target, pending revisions) still exit 1. Usage errors stay 2. Scripts testing for exactly 1 must change.
+- Added global `--output {text,json}` (default `text`). JSON prints one `promptmigrate.output/1` envelope on stdout
+  for every command, success or handled error; PromptMigrate warnings are listed in it instead of printed to stderr.
+  Default text output is unchanged. See `docs/CLI_SPEC.md` and ADR-023.
+- New `promptmigrate.output`; every command exposes `execute(args)` returning an `output.Result`.
+
 ### Community files
 
 - Added `examples/multi-agent-basic/`: two agent drafts and a cross-platform `run.py` that walks the full lifecycle.
