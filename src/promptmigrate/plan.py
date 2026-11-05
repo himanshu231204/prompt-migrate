@@ -29,10 +29,12 @@ class MigrationPlan:
 
 
 def _unknown(target: str) -> TargetError:
+    """The error every command raises for a target that is not a revision id."""
     return TargetError(f"Unknown target revision: {target}")
 
 
 def upgrade_count(revisions: list[Revision], target: str) -> int:
+    """Number of revisions that should be applied once `target` (`head` or a revision id) is reached."""
     ids = [r.revision for r in revisions]
     if target == "head":
         return len(ids)
@@ -42,12 +44,14 @@ def upgrade_count(revisions: list[Revision], target: str) -> int:
 
 
 def upgrade_steps(revisions: list[Revision], applied: int, target_count: int) -> list[Revision]:
+    """The revisions to apply, oldest first; a target behind the current position is an error."""
     if applied > target_count:
         raise TargetError("Upgrade target is behind current revision; use downgrade")
     return revisions[applied:target_count]
 
 
 def downgrade_count(revisions: list[Revision], applied: int, target: str) -> int:
+    """Number of revisions that should remain applied after reverting to `target` (`-1`, `base` or a revision id)."""
     ids = [r.revision for r in revisions]
     if target == "-1":
         return max(0, applied - 1)
@@ -59,12 +63,14 @@ def downgrade_count(revisions: list[Revision], applied: int, target: str) -> int
 
 
 def downgrade_steps(revisions: list[Revision], applied: int, target_count: int) -> list[Revision]:
+    """The revisions to revert, newest first; a target ahead of the current position is an error."""
     if target_count > applied:
         raise TargetError("Downgrade target is ahead of current revision; use upgrade")
     return list(reversed(revisions[target_count:applied]))
 
 
 def _kind(old, new) -> str:
+    """Classify one config change by its from and to values: create, update, delete or unchanged."""
     if old is None:
         return "create" if new is not None else "unchanged"
     if new is None:
@@ -73,6 +79,7 @@ def _kind(old, new) -> str:
 
 
 def _step(revision: Revision, backward: bool) -> Step:
+    """One revision as a plan step; a backward step swaps before and after."""
     old, new = ("after", "before") if backward else ("before", "after")
     return Step(revision.revision, tuple(
         (name, _kind(change[old], change[new])) for name, change in sorted(revision.changes.items())
@@ -80,6 +87,7 @@ def _step(revision: Revision, backward: bool) -> Step:
 
 
 def _id(revisions: list[Revision], count: int) -> str | None:
+    """The id of the newest of the first `count` revisions, or None for base."""
     return revisions[count - 1].revision if count else None
 
 
