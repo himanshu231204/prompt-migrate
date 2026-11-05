@@ -70,6 +70,13 @@ Revisions (source history) ──apply──> Local environment state (SQLite)
 Local environment state ──get──> Consumer (only if explicitly integrated)
 ```
 
+## Read-only migration plan
+
+`plan` resolves a requested target and previews the revision steps and config changes without writing state. The pure
+`promptmigrate.plan` target resolver is shared by `plan`, `upgrade`, and `downgrade`; accepted targets and direction
+rules are specified in [`CLI_SPEC.md`](CLI_SPEC.md). Planning verifies the environment using the same integrity and
+drift checks as `check` before producing a preview.
+
 ## Replay and change preconditions
 
 Let `S_i` represent the reconstructed state after revision `i`; `S_0 = {}`.

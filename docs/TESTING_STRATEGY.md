@@ -23,6 +23,7 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 | 2026-11-01 (after PR 4) | Windows 11, Python 3.11.9 | `.venv/Scripts/python -m pytest -q -rxXs` → `469 passed, 16 skipped, 33 warnings`; original unittest suite → `Ran 7 tests ... OK` |
 | 2026-11-03 (after the package layout refactor, suite directories and multi-agent example) | Windows 11, Python 3.11.9 | `python -m pytest -q` → `620 passed, 18 skipped, 33 warnings`; original unittest suite → `Ran 7 tests ... OK` |
 | 2026-11-05 (after PR 5, `plan`) | Linux, Python 3.13.18 | `python -m pytest -q` → `681 passed, 1 skipped, 39 warnings` (Windows/macOS not re-run for this change) |
+| 2026-11-05 (after PR 6) | Windows 11, Python 3.11.9 | `python -m pytest -q` → `713 passed, 18 skipped, 33 warnings`; original unittest suite → `Ran 7 tests ... OK` |
 
 GitHub Actions runs the complete suite inside Linux Docker containers, and natively on `windows-latest` and
 `macos-latest`, for Python 3.10, 3.12 and 3.13. The native jobs cover the store's Windows-only paths and macOS's
@@ -36,7 +37,7 @@ Tests currently cover: initial revision and two environments; downgrade; checksu
 |---|---|
 | `tests/test_core.py` | the original seven starter tests; kept at the root so `unittest discover -s tests` still finds them |
 | `tests/unit/` | A — parser, graph, strict loader, equality, content rules, errors, legacy compatibility, known bugs, module layout |
-| `tests/property/` | B — `hypothesis` state-machine tests (created by PR 5) |
+| `tests/integration/test_plan_equals_apply.py` | B — `hypothesis` state-machine property test (created by PR 5) |
 | `tests/integration/` | C — SQLite lifecycle, environment store, locking, declared environments |
 | `tests/contract/` | D — CLI exit codes, stdout/stderr, warnings, reads never write |
 | `tests/security/` | E — secret scanner, redaction, allowlist, revision blocking |

@@ -4,6 +4,8 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
 
 ## Unreleased
 
+- Corrected README and handoff documentation to include the shipped `plan` command and native Windows/macOS CI coverage; refreshed the documented test baseline and suite location. Brought `PRD.md`, `ROADMAP.md` and `LOW_LEVEL_DESIGN.md` up to date with the shipped `plan`, exit codes, JSON output, typed errors and strict loader. Moved all agent rules and the architecture overview from `CLAUDE.md` into `AGENTS.md`.
+
 ### Phase 1 cycle 1 — exit codes and `--output json` (PR 6)
 
 - **Contract:** handled errors now exit by type: 3 for schema/source errors, 4 for drift, integrity and conflicts, 5

@@ -46,7 +46,7 @@ class Change:
     after: dict | None          # None = absent
 ```
 
-Note: `Change` is a proposed typed wrapper; the current starter uses nested dictionaries. Similarly `Plan`, `EnvironmentState`, and `ConfigBundle` are future abstractions.
+Note: `Change` is a proposed typed wrapper; the current code uses nested dictionaries. `MigrationPlan` is implemented in `plan.py` (section 8); `EnvironmentState` and `ConfigBundle` are future abstractions.
 
 ## 3. Filesystem contract
 
@@ -130,10 +130,10 @@ changes = {
 
 The diff compares Git source head to drafts, **never** a random local developer's applied SQLite state. Deleting a draft means desired deletion and must produce a deliberate reversible migration.
 
-## 8. Migration planning (target module; current logic embedded in executor)
+## 8. Migration planning (`plan.py`)
 
 Input: `target`, source revisions, verified environment applied prefix.  
-Output: deterministic `MigrationPlan(direction, start, target, ordered_steps, expected_changes)`.
+Output: deterministic `MigrationPlan(direction, start, target, steps)`, where each `Step` holds a revision id and its sorted `(name, kind)` changes. `upgrade`, `downgrade` and `plan` all resolve targets here.
 
 Target resolution:
 
@@ -174,7 +174,7 @@ with sqlite_connection as db:
 
 Downgrade reverses revision order; asserts `after` and restores `before`. The ledger is updated in the same SQLite transaction. Make no HTTP calls or eval calls inside this transaction.
 
-## 11. Error taxonomy (target)
+## 11. Error taxonomy
 
 | Error | Example | Behavior |
 |---|---|---|
@@ -187,7 +187,7 @@ Downgrade reverses revision order; asserts `after` and restores `before`. The le
 | TargetError | unknown revision/invalid direction | fail closed |
 | StorageError | SQLite busy/corrupt | preserve transaction guarantees |
 
-Current starter raises a single `MigrationError` in most domain cases; more granular types are a *proposed* API improvement.
+These are implemented in `errors.py` as `MigrationError` subclasses, along with `EnvironmentNotDeclaredError`, `SecretDetectedError` (a `SchemaError`) and `PendingRevisionsError`. `output.py` maps them to exit codes (see `CLI_SPEC.md`).
 
 ## 12. Determinism and idempotence
 
@@ -210,7 +210,7 @@ Current starter raises a single `MigrationError` in most domain cases; more gran
 - SQLite busy/transaction conflicts; process interrupted after write but before commit.
 - Malformed/corrupted SQLite, missing migration source history.
 - Multi-developer merge conflicts and concurrent revision generation (no automatic merge in MVP).
-- Symlink/path traversal and oversized JSON files (hardening pending).
+- Symlink/path traversal and oversized JSON files (rejected by the strict loader since PR 3).
 
 ## 14. Public interfaces (target)
 

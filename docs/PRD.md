@@ -36,9 +36,9 @@
 | FR-08 | Downgrade to predecessor or base, restoring earlier snapshots | Must | MVP |
 | FR-09 | Verify applied-file checksum and detect SQLite config drift | Must | MVP |
 | FR-10 | Expose current revision and applied configuration | Must | MVP |
-| FR-11 | Dry-run `plan` with deterministic change summary | Must | Next hardening milestone |
+| FR-11 | Dry-run `plan` with deterministic change summary | Must | Done (Phase 1 cycle 1) |
 | FR-12 | Strict JSON schema, canonical serialization/versioned artifact format | Must | Next hardening milestone |
-| FR-13 | Structured CLI JSON output and meaningful errors/exit codes | Should | Next hardening milestone |
+| FR-13 | Structured CLI JSON output and meaningful errors/exit codes | Should | Done (Phase 1 cycle 1) |
 | FR-14 | Evaluation gates (golden datasets, structured outputs, policies) | Must | Later |
 | FR-15 | PostgreSQL shared state, immutable releases, provider adapters | Must | Later production |
 | FR-16 | Approved promotion + release pointer rollback | Must | Later production |
@@ -51,8 +51,8 @@
 - **Determinism:** migration execution makes no LLM call; replay produces identical logical state.
 - **Portability:** Python 3.10+; standard library runtime in initial prototype.
 - **Reviewability:** JSON revisions are diff-friendly; Git stores drafts and revisions.
-- **Security:** no secrets in revisions; future secret scanning and policy enforcement.
-- **Observability:** clear human errors now; JSON output/logging later.
+- **Security:** no secrets in revisions; heuristic secret scanning now (`revision` blocks, `diff`/`get` redact), policy enforcement later.
+- **Observability:** clear human errors and `--output json` now; logging later.
 - **Compatibility:** explicit format and API versioning before stable release.
 
 ## MVP acceptance criteria
