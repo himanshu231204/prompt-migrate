@@ -18,6 +18,7 @@ Familiar to Alembic users, transparent in CI, safe by default. Commands distingu
 | `promptmigrate downgrade -1 --env dev` | Revert one revision | Default downgrade behavior |
 | `promptmigrate downgrade base --env dev` | Revert all | Restores empty source state |
 | `promptmigrate downgrade <revision> --env dev` | Revert to exact revision | Must be behind/equal to current |
+| `promptmigrate plan --env dev [--target head]` | Preview what `upgrade`/`downgrade` would do | Read-only: verifies the environment like `check`, writes nothing (no state file, no manifest adoption, no lock). Target is `head` (default), `-1`, `base` or a revision id; the direction is inferred from where the target lies. Lists each revision and its config changes (`create`/`update`/`delete`); prints `nothing to do` at the target. Same `Error:` text for unknown targets, drift and tampering as the commands it previews. Text output only until `--output json` |
 | `promptmigrate check --env dev` | Check applied integrity/state drift | Does not require env at source head; warns about secrets in history and stale allowlist entries |
 | `promptmigrate check --env dev --require-head` | Also require no pending revisions | Helpful for CI |
 | `promptmigrate get sql_agent --env dev` | Read applied local JSON | Only local stored config; secret-like values shown as <redacted:RULE> |
@@ -56,7 +57,6 @@ promptmigrate downgrade -1 --env staging
 
 | Command | Contract |
 |---|---|
-| `plan --env dev [--target head]` | Read-only ordered migration preview, changed names, warnings |
 | `validate` | Validate all source/drafts against strict schema and revisions |
 | `--output json` | Machine-readable output for every command (design syntax TBD) |
 | `eval --suite regression` | Run evaluation policy against candidate configuration |

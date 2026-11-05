@@ -15,10 +15,10 @@ You are helping design and eventually implement **PromptMigrate**, an open-sourc
 
 ## Verified baseline (2026-10-30)
 
-- Starter commands implemented: `init`, `revision`, `history`, `diff`, `current`, `upgrade`, `downgrade`, `check`, `get`.
+- Starter commands implemented: `init`, `revision`, `history`, `diff`, `current`, `upgrade`, `downgrade`, `check`, `get`, `plan` (read-only preview).
 - State: per-environment local SQLite files under `.promptmigrate/states/`; revisions are declarative JSON in `.promptmigrate/versions/`.
 - Test status on Windows 11 / Python 3.11: all tests pass after Phase 1 cycle 1 PR 1, which made every command close its SQLite connection. Run `python -m pytest -q`.
-- Do not claim `plan`, `eval`, `export`, `promote`, `reconcile`, cloud adapters, SDK, Postgres, RBAC, signed revisions, or real production activation already work.
+- Do not claim `eval`, `export`, `promote`, `reconcile`, cloud adapters, SDK, Postgres, RBAC, signed revisions, or real production activation already work.
 
 ## Engineering process
 

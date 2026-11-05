@@ -20,8 +20,8 @@ src/promptmigrate/
   core.py            public facade: re-exports only
 ```
 
-Reserved for upcoming work: `plan.py` (PR 5, pure target resolution, used by `commands/upgrade.py` and
-`commands/downgrade.py`) and `output.py` (PR 6, text/JSON rendering and exit codes). Later phases add their own
+`plan.py` (pure target resolution and the `MigrationPlan` model) is used by `commands/upgrade.py`,
+`commands/downgrade.py` and `commands/plan.py`. Reserved for upcoming work: `output.py` (PR 6, text/JSON rendering and exit codes). Later phases add their own
 modules (evaluation gates, release activation, provider adapters) instead of growing existing ones.
 
 Keep the public command behavior stable during refactor. Refactor in tested increments rather than recreating implementation from scratch.

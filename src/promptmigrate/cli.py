@@ -4,12 +4,12 @@ import argparse
 import sqlite3
 import sys
 import warnings
-from .commands import check, current, diff, downgrade, env, get, history, init, revision, upgrade
+from .commands import check, current, diff, downgrade, env, get, history, init, plan, revision, upgrade
 from .errors import MigrationError, PromptMigrateWarning
 
 COMMANDS = {
     "init": init, "revision": revision, "history": history, "diff": diff, "current": current,
-    "upgrade": upgrade, "downgrade": downgrade, "check": check, "get": get, "env": env,
+    "upgrade": upgrade, "downgrade": downgrade, "check": check, "get": get, "env": env, "plan": plan,
 }
 
 
@@ -30,6 +30,9 @@ def build_parser() -> argparse.ArgumentParser:
     down = sub.add_parser("downgrade", help="Revert environment to -1, base or revision")
     down.add_argument("target", nargs="?", default="-1")
     down.add_argument("--env", default="dev")
+    pln = sub.add_parser("plan", help="Preview upgrade/downgrade to a target without changing anything")
+    pln.add_argument("--target", default="head", help="head, -1, base or a revision id (default: head)")
+    pln.add_argument("--env", default="dev")
     chk = sub.add_parser("check", help="Verify no drift or edited-applied migrations")
     chk.add_argument("--env", default="dev")
     chk.add_argument("--require-head", action="store_true", help="Fail if migration(s) pending")
