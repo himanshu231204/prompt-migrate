@@ -11,8 +11,16 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
   unknown target, pending revisions) still exit 1. Usage errors stay 2. Scripts testing for exactly 1 must change.
 - Added global `--output {text,json}` (default `text`). JSON prints one `promptmigrate.output/1` envelope on stdout
   for every command, success or handled error; PromptMigrate warnings are listed in it instead of printed to stderr.
-  Default text output is unchanged. See `docs/CLI_SPEC.md` and ADR-023.
-- New `promptmigrate.output`; every command exposes `execute(args)` returning an `output.Result`.
+  Default text output is unchanged. See `docs/CLI_SPEC.md` and ADR-024.
+- New `promptmigrate.output`; every command, including `plan`, exposes `execute(args)` returning an `output.Result`.
+
+### Phase 1 cycle 1 — read-only `plan`
+
+- Added `promptmigrate plan [--env E] [--target head|-1|base|<revision>]`: a read-only preview of what `upgrade` or
+  `downgrade` would do. It verifies the environment like `check`, writes nothing and infers the direction from the
+  target. **Contract:** new command; no change to existing commands, output or error messages.
+- Target resolution moved into the pure `promptmigrate.plan` module, shared by `upgrade`, `downgrade` and `plan`.
+  A hypothesis property test checks that `plan` matches what the commands apply (ADR-023).
 
 ### Community files
 
@@ -20,6 +28,9 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
   `tests/contract/test_examples.py` runs it on every test run.
 - Added `CONTRIBUTING.md` (setup, rules, a "where does X live" table), `CODE_OF_CONDUCT.md` (Contributor
   Covenant 2.1), a root `SECURITY.md` (private reporting through GitHub), and issue and pull request templates.
+- CodeRabbit now reviews draft pull requests (`reviews.auto_review.drafts: true` in `.coderabbit.yaml`).
+- `docs/ROADMAP.md` marks the six completed Phase 1 cycle 1 items. `plan`, exit codes 0–5 and `--output json`
+  remain open.
 
 ### Phase 1 cycle 1 — package layout refactor
 

@@ -13,6 +13,7 @@ from .commands.env import env_add, env_list
 from .commands.get import get_config, redacted_config
 from .commands.history import redacted_history
 from .commands.init import init
+from .commands.plan import plan
 from .commands.revision import revision
 from .commands.upgrade import upgrade
 from .draftdiff import draft_diff, redacted_diff

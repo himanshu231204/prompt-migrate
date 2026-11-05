@@ -5,25 +5,20 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .. import apply, output, revisions, store
-from ..errors import TargetError
+from .. import apply, output, plan, revisions, store
 
 
 def upgrade(project_dir: Path, env: str, target: str = "head") -> list[str]:
     env = store.resolve_environment(project_dir, env)
     revisions_ = revisions.load_revisions(project_dir)
-    targets = [r.revision for r in revisions_]
-    if target != "head" and target not in targets:
-        raise TargetError(f"Unknown target revision: {target}")
-    target_count = len(revisions_) if target == "head" else targets.index(target) + 1
+    target_count = plan.upgrade_count(revisions_, target)
     with store.connect_write(project_dir, env) as db:
         db.execute("BEGIN IMMEDIATE")
         applied_count = apply._verify(db, revisions_)
-        if applied_count > target_count:
-            raise TargetError("Upgrade target is behind current revision; use downgrade")
-        apply.migrate(db, revisions_[applied_count:target_count])
+        steps = plan.upgrade_steps(revisions_, applied_count, target_count)
+        apply.migrate(db, steps)
     store.adopt_environments(project_dir)
-    return targets[applied_count:target_count]
+    return [r.revision for r in steps]
 
 
 def execute(args: argparse.Namespace) -> output.Result:

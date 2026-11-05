@@ -18,6 +18,7 @@ Familiar to Alembic users, transparent in CI, safe by default. Commands distingu
 | `promptmigrate downgrade -1 --env dev` | Revert one revision | Default downgrade behavior |
 | `promptmigrate downgrade base --env dev` | Revert all | Restores empty source state |
 | `promptmigrate downgrade <revision> --env dev` | Revert to exact revision | Must be behind/equal to current |
+| `promptmigrate plan --env dev [--target head]` | Preview what `upgrade`/`downgrade` would do | Read-only: verifies the environment like `check`, writes nothing (no state file, no manifest adoption, no lock). Target is `head` (default), `-1`, `base` or a revision id; the direction is inferred from where the target lies. Lists each revision and its config changes (`create`/`update`/`delete`); prints `nothing to do` at the target. Same `Error:` text for unknown targets, drift and tampering as the commands it previews. |
 | `promptmigrate check --env dev` | Check applied integrity/state drift | Does not require env at source head; warns about secrets in history and stale allowlist entries |
 | `promptmigrate check --env dev --require-head` | Also require no pending revisions | Helpful for CI |
 | `promptmigrate get sql_agent --env dev` | Read applied local JSON | Only local stored config; secret-like values shown as <redacted:RULE> |
@@ -56,7 +57,6 @@ promptmigrate downgrade -1 --env staging
 
 | Command | Contract |
 |---|---|
-| `plan --env dev [--target head]` | Read-only ordered migration preview, changed names, warnings |
 | `validate` | Validate all source/drafts against strict schema and revisions |
 | `eval --suite regression` | Run evaluation policy against candidate configuration |
 | `export --env dev` | Emit immutable artifact for a runtime/CI consumer |
@@ -122,6 +122,7 @@ handled errors alike. Schema `promptmigrate.output/1`:
 | `diff` | `changes` (name → `{before, after}`, redacted), `redacted[]` |
 | `current` | `revision` (`null` at base), `applied`, `total` |
 | `upgrade` / `downgrade` | `direction` (`up`/`down`), `target`, `revisions[]` (ids applied or reverted, in order) |
+| `plan` | `direction` (`upgrade`/`downgrade`/`none`), `start`, `target` (ids, `null` at base), `steps[]` (`revision`, `changes[]` of `name`, `kind`: `create`/`update`/`delete`/`unchanged`), in the order they would run |
 | `check` | `consistent` (always `true`; inconsistency is an error), `applied`, `total` |
 | `get` | `name`, `config` (redacted), `redacted[]` |
 | `env add` | `name` |

@@ -79,6 +79,21 @@ def test_current_upgrade_check_downgrade_get(project, capsys):
     assert down["data"] == {"direction": "down", "target": "-1", "revisions": [rid]}
 
 
+
+def test_plan(project, capsys):
+    rid = ok(capsys, project, "revision", "-m", "initial")["data"]["revision"]
+    up = ok(capsys, project, "plan", "--env", "dev")
+    assert up["command"] == "plan" and up["env"] == "dev"
+    assert up["data"] == {"direction": "upgrade", "start": None, "target": rid,
+                          "steps": [{"revision": rid, "changes": [{"name": "assistant", "kind": "create"}]}]}
+    ok(capsys, project, "upgrade", "--env", "dev")
+    assert ok(capsys, project, "plan")["data"] == {"direction": "none", "start": rid, "target": rid, "steps": []}
+    down = ok(capsys, project, "plan", "--target", "base")
+    assert down["data"]["direction"] == "downgrade" and down["data"]["target"] is None
+    assert down["data"]["steps"] == [{"revision": rid, "changes": [{"name": "assistant", "kind": "delete"}]}]
+    c, doc, err = jrun(capsys, project, "plan", "--target", "ffffffffffff")
+    assert (c, err, doc["command"], doc["error"]["code"]) == (1, "", "plan", "error")
+
 @pytest.mark.parametrize("argv,code,name", [
     (["upgrade", "ffffffffffff"], 1, "error"),
     (["revision", "-m", "x"], 3, "schema"),

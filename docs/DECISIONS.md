@@ -106,7 +106,14 @@ Each ADR documents a decision and its rationale. **Confirmed** means the convers
 **Why:** a contributor can find where something lives from its name, and `plan` (PR 5), `--output json` (PR 6), evaluation gates and release activation each get an obvious new module instead of growing one file.  
 **Consequence:** internal calls go through module attributes (`project.read_drafts(...)`), so a test patches the defining module; patching `core` or `cli` no longer changes behaviour. The one exception is `apply.canonical`, imported by name so that a test can fail a state write without affecting `same()`. No CLI, file-format or checksum change.
 
-## ADR-023 — Exit codes 0–5 and a versioned JSON envelope owned by `output.py`
+## ADR-023 — `plan` infers direction and shares target resolution with `upgrade` and `downgrade`
+
+**Status:** implemented (Phase 1 cycle 1, PR 5).  
+**Decision:** `plan --target` accepts `head`, `-1`, `base` or a revision id. There is no direction flag: the direction follows from where the target lies relative to the verified applied position (later is an upgrade, earlier a downgrade, equal a no-op). Target resolution lives in the pure module `plan.py` and is called by `upgrade`, `downgrade` and `plan` alike. `plan` reads through the read-only SQLite connection and `_verify`, so it fails closed on drift and tampering and never writes.  
+**Why:** a preview that resolves targets differently from the commands it previews is worse than none. A single resolver, plus a property test that compares `plan` with what `upgrade`/`downgrade` apply on random histories, makes disagreement a test failure.  
+**Consequence:** `plan` is a snapshot, not a lock: another process may change the environment before the real command runs, which re-verifies under `BEGIN IMMEDIATE`. `plan` previews environment migrations only; `diff` remains the drafts-versus-head comparison. Existing error messages are unchanged. Text output only; `--output json` and exit codes arrive with PR 6.
+
+## ADR-024 — Exit codes 0–5 and a versioned JSON envelope owned by `output.py`
 
 **Status:** implemented (Phase 1 cycle 1, PR 6).  
 **Decision:** each command exposes `execute(args) -> output.Result` (JSON-safe `data` plus the exact text it printed before). `output.py` renders text or one `promptmigrate.output/1` JSON envelope and holds the only error-to-exit-code table: `SchemaError`/`RevisionGraphError` → 3, `DriftError`/`IntegrityError`/`MigrationConflictError` → 4, `StorageError`/`sqlite3.Error`/`OSError` → 5, other handled errors → 1, argparse → 2. Codes 6 and 7 stay reserved. In JSON mode handled errors and PromptMigrate warnings are in the envelope, not on stderr; warnings from other libraries still reach stderr.  
