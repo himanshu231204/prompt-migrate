@@ -33,6 +33,7 @@ def downgrade(project_dir: Path, env: str, target: str = "-1") -> list[str]:
 
 
 def execute(args: argparse.Namespace) -> output.Result:
+    """Run `downgrade` and return its text and JSON result."""
     project_dir = Path(args.project)
     label = store.display_name(project_dir, args.env)
     ids = downgrade(project_dir, args.env, args.target)
@@ -42,4 +43,5 @@ def execute(args: argparse.Namespace) -> output.Result:
 
 
 def run(args: argparse.Namespace) -> None:
+    """Run `downgrade` and print its text output."""
     output.emit_result(execute(args), "text", [])

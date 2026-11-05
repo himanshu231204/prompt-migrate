@@ -35,10 +35,14 @@ def redacted_config(project_dir: Path, env: str, name: str) -> tuple[dict[str, A
 
 
 def execute(args: argparse.Namespace) -> output.Result:
-    config, paths = redacted_config(Path(args.project), args.env, args.name)
+    """Run `get` and return its text and JSON result."""
+    project_dir = Path(args.project)
+    label = store.display_name(project_dir, args.env)
+    config, paths = redacted_config(project_dir, args.env, args.name)
     data = {"name": args.name, "config": config, "redacted": paths}
-    return output.Result("get", data, project.pretty(config), args.env)
+    return output.Result("get", data, project.pretty(config), label)
 
 
 def run(args: argparse.Namespace) -> None:
+    """Run `get` and print its text output."""
     output.emit_result(execute(args), "text", [])

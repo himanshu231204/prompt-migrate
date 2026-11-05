@@ -10,6 +10,7 @@ from . import check
 
 
 def execute(args: argparse.Namespace) -> output.Result:
+    """Run `current` and return its text and JSON result."""
     project_dir = Path(args.project)
     label = store.display_name(project_dir, args.env)
     n, total = check.check(project_dir, args.env)
@@ -20,4 +21,5 @@ def execute(args: argparse.Namespace) -> output.Result:
 
 
 def run(args: argparse.Namespace) -> None:
+    """Run `current` and print its text output."""
     output.emit_result(execute(args), "text", [])

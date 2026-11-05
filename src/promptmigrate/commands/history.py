@@ -27,6 +27,7 @@ def redacted_history(project_dir: Path, load=None) -> tuple[list[revisions.Revis
 
 
 def execute(args: argparse.Namespace) -> output.Result:
+    """Run `history` and return its text and JSON result."""
     shown, redacted = redacted_history(Path(args.project))
     data = {"revisions": [{"revision": r.revision, "down_revision": r.down_revision, "message": r.message}
                           for r in shown],
@@ -36,4 +37,5 @@ def execute(args: argparse.Namespace) -> output.Result:
 
 
 def run(args: argparse.Namespace) -> None:
+    """Run `history` and print its text output."""
     output.emit_result(execute(args), "text", [])

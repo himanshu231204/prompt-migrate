@@ -51,6 +51,7 @@ def audit_secrets(project_dir: Path) -> None:
 
 
 def execute(args: argparse.Namespace) -> output.Result:
+    """Run `check` and return its text and JSON result."""
     project_dir = Path(args.project)
     label = store.display_name(project_dir, args.env)
     audit_secrets(project_dir)
@@ -60,4 +61,5 @@ def execute(args: argparse.Namespace) -> output.Result:
 
 
 def run(args: argparse.Namespace) -> None:
+    """Run `check` and print its text output."""
     output.emit_result(execute(args), "text", [])

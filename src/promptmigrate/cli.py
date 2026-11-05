@@ -15,6 +15,7 @@ COMMANDS = {
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """The argument parser: global flags, then one subparser per command."""
     p = argparse.ArgumentParser(prog="promptmigrate", description="Alembic-style prompt configuration migrations")
     p.add_argument("--project", default=".", help="Project directory, default: current directory")
     p.add_argument("--output", choices=output.FORMATS, default="text", help="Output format, default: text")
@@ -47,6 +48,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Parse, run the command, render the result or handled error, and return the exit code."""
     args = build_parser().parse_args(argv)
     result = error = unhandled = None
     with warnings.catch_warnings(record=True) as caught:

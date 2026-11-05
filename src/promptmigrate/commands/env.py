@@ -19,6 +19,7 @@ def env_list(project_dir: Path) -> list[tuple[str, bool]]:
 
 
 def execute(args: argparse.Namespace) -> output.Result:
+    """Run `env` and return its text and JSON result."""
     project_dir = Path(args.project)
     if args.env_command == "add":
         env_add(project_dir, args.name)
@@ -30,4 +31,5 @@ def execute(args: argparse.Namespace) -> output.Result:
 
 
 def run(args: argparse.Namespace) -> None:
+    """Run `env` and print its text output."""
     output.emit_result(execute(args), "text", [])

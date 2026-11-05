@@ -33,9 +33,11 @@ def init(project_dir: Path) -> Path:
 
 
 def execute(args: argparse.Namespace) -> output.Result:
+    """Run `init` and return its text and JSON result."""
     root = init(Path(args.project))
     return output.Result("init", {"path": str(root)}, f"Initialized {root}\n")
 
 
 def run(args: argparse.Namespace) -> None:
+    """Run `init` and print its text output."""
     output.emit_result(execute(args), "text", [])

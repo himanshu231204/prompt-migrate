@@ -11,10 +11,11 @@ import json
 import sqlite3
 import sys
 import warnings
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
-from . import errors
+from . import errors, store
 
 SCHEMA = "promptmigrate.output/1"
 FORMATS = ("text", "json")
@@ -51,6 +52,7 @@ class Warned:
 
 
 def exit_code_for(exc: BaseException) -> int:
+    """The process exit code for a handled error (1, 3, 4 or 5)."""
     for cls, code, _name in _TABLE:
         if isinstance(exc, cls):
             return code
@@ -58,6 +60,7 @@ def exit_code_for(exc: BaseException) -> int:
 
 
 def error_name_for(exc: BaseException) -> str:
+    """The `error.code` name used in the JSON envelope for a handled error."""
     for cls, _code, name in _TABLE:
         if isinstance(exc, cls):
             return name
@@ -68,7 +71,13 @@ def describe(args: Any) -> tuple[str, str | None]:
     """(command name, environment) of a parsed command line, for an error envelope; `env` has no --env of its own."""
     if getattr(args, "env_command", None):
         return f"env {args.env_command}", None
-    return args.command, getattr(args, "env", None)
+    env = getattr(args, "env", None)
+    if env is not None:
+        try:
+            env = store.display_name(Path(args.project), env)
+        except Exception:  # an unreadable manifest or invalid name was already reported; keep what was typed
+            pass
+    return args.command, env
 
 
 def collect_warnings(caught: list[warnings.WarningMessage]) -> list[Warned]:
@@ -84,6 +93,7 @@ def collect_warnings(caught: list[warnings.WarningMessage]) -> list[Warned]:
 
 
 def _dump(doc: dict[str, Any]) -> str:
+    """One JSON document on one line, newline-terminated; non-finite numbers are rejected."""
     return json.dumps(doc, ensure_ascii=True, allow_nan=False) + "\n"
 
 

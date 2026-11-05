@@ -147,3 +147,19 @@ def test_secrets_in_history_redacted_in_json(project, capsys, monkeypatch):
     assert code == 0 and secret not in out + err
     doc = json.loads(out)
     assert doc["warnings"] and "<redacted:" in doc["data"]["revisions"][0]["message"]
+
+
+def test_env_uses_declared_spelling_on_success_and_error(project, capsys):
+    ok(capsys, project, "revision", "-m", "initial")
+    ok(capsys, project, "upgrade", "--env", "dev")
+    assert ok(capsys, project, "get", "assistant", "--env", "DEV")["env"] == "dev"
+    assert ok(capsys, project, "current", "--env", "DEV")["env"] == "dev"
+    code, doc, _ = jrun(capsys, project, "get", "nope", "--env", "DEV")
+    assert code == 1 and doc["env"] == "dev"
+
+
+def test_error_envelope_keeps_the_given_spelling_when_resolution_fails(project, capsys):
+    code, doc, _ = jrun(capsys, project, "check", "--env", "../escape")
+    assert code == 3 and doc["env"] == "../escape"
+    code, doc, _ = jrun(capsys, project, "check", "--env", "Nope")
+    assert code == 1 and doc["env"] == "Nope"

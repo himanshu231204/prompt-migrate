@@ -64,10 +64,12 @@ def revision(project_dir: Path, message: str) -> revisions.Revision:
 
 
 def execute(args: argparse.Namespace) -> output.Result:
+    """Run `revision` and return its text and JSON result."""
     r = revision(Path(args.project), args.message)
     data = {"revision": r.revision, "down_revision": r.down_revision, "message": r.message, "path": str(r.path)}
     return output.Result("revision", data, f"Created {r.revision} (parent: {r.down_revision or 'base'}): {r.path}\n")
 
 
 def run(args: argparse.Namespace) -> None:
+    """Run `revision` and print its text output."""
     output.emit_result(execute(args), "text", [])
