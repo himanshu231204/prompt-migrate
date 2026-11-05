@@ -148,3 +148,20 @@ def test_warnings_never_change_exit_code(project, capsys, monkeypatch):
         raise errors.DriftError("drifted")
     monkeypatch.setattr(revisions, "load_revisions", noisy_failing)
     assert run(capsys, project, "history") == (4, "", "Warning: careful\nError: drifted\n")
+
+
+class BrokenStdout:
+    def write(self, _text):
+        raise BrokenPipeError(32, "Broken pipe")
+
+    def flush(self):
+        pass
+
+
+@pytest.mark.parametrize("fmt", ["text", "json"])
+def test_stdout_write_failure_is_a_storage_error(project, capsys, monkeypatch, fmt):
+    import sys
+    monkeypatch.setattr(sys, "stdout", BrokenStdout())
+    code = cli.main(["--project", str(project), "--output", fmt, "history"])
+    assert code == 5
+    assert capsys.readouterr().err.startswith("Error: ")

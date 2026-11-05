@@ -72,9 +72,13 @@ def main(argv: list[str] | None = None) -> int:
     if unhandled is not None:
         raise unhandled
     warned = output.collect_warnings(caught)
-    if error is not None:
-        return output.emit_error(error, args.output, *output.describe(args), warned)
-    output.emit_result(result, args.output, warned)
+    try:
+        if error is not None:
+            return output.emit_error(error, args.output, *output.describe(args), warned)
+        output.emit_result(result, args.output, warned)
+    except OSError as e:  # writing the result failed: a closed pipe or a full destination
+        print(f"Error: {e}", file=sys.stderr)
+        return 5
     return 0
 
 
