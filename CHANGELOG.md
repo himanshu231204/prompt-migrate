@@ -10,6 +10,9 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
   `tests/contract/test_examples.py` runs it on every test run.
 - Added `CONTRIBUTING.md` (setup, rules, a "where does X live" table), `CODE_OF_CONDUCT.md` (Contributor
   Covenant 2.1), a root `SECURITY.md` (private reporting through GitHub), and issue and pull request templates.
+- CodeRabbit now reviews draft pull requests (`reviews.auto_review.drafts: true` in `.coderabbit.yaml`).
+- `docs/ROADMAP.md` marks the six completed Phase 1 cycle 1 items. `plan`, exit codes 0–5 and `--output json`
+  remain open.
 
 ### Phase 1 cycle 1 — package layout refactor
 
