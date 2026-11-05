@@ -1,6 +1,6 @@
 # ROADMAP — From local prototype to reliable open-source project
 
-> Milestones are **plans**, not shipping promises. Status checked against the previously generated starter on 2026-10-29.
+> Milestones are **plans**, not shipping promises. Status checked against the code on 2026-11-05.
 
 ## Phase 0 — Existing proof of concept
 
@@ -22,14 +22,14 @@
 
 ### Cycle 1 (PRs 1–6 + 3b)
 
-- [ ] Connection lifecycle fix; Linux Docker CI matrix across Python 3.10, 3.12 and 3.13 (native Windows/macOS CI not included).
-- [ ] Characterization tests and legacy compatibility fixtures.
-- [ ] Strict parsing (duplicate keys, NaN, size/depth, symlinks), compatibility tiers, canonical equality.
-- [ ] Heuristic secret safeguard: `revision` blocks, `diff`/`get` redact, reviewed allowlist.
-- [ ] Declared environments; read commands never write.
-- [ ] Refactor core into testable modules incrementally, without breaking the CLI.
+- [x] Connection lifecycle fix; Linux Docker CI matrix across Python 3.10, 3.12 and 3.13, plus native Windows and macOS jobs (`.github/workflows/ci.yml`). Linux/macOS support is claimed only after a remote CI run passes.
+- [x] Characterization tests and legacy compatibility fixtures (`tests/fixtures/legacy`, `tests/fixtures/legacy_breaking`).
+- [x] Strict parsing (duplicate keys, NaN, size/depth, symlinks), compatibility tiers, canonical equality (`protocol/`).
+- [x] Heuristic secret safeguard: `revision` blocks, `diff`/`get` redact, reviewed allowlist (`secretscan.py`).
+- [x] Declared environments; read commands never write (`store/`, `env add`, `env list`).
+- [x] Refactor core into testable modules incrementally, without breaking the CLI (ADR-022; `core.py` is a re-export facade).
 - [ ] Read-only `plan` with a property-based plan==apply test.
-- [ ] Typed errors, exit codes 0–5, `--output json`.
+- [ ] Typed errors, exit codes 0–5, `--output json`. (Typed error classes are done in `errors.py`; the CLI still exits 0/1, and `--output json` is pending.)
 
 ### Remaining after cycle 1 (cycle 2+)
 
@@ -80,4 +80,4 @@ No SaaS dashboard, no visual prompt editor, no paid cloud control plane, no dire
 
 ## First next step
 
-Run a **design + code gap review** using [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) and [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md), then execute Phase 1 in small tested PRs.
+Finish Phase 1 cycle 1: the read-only `plan` command, then exit codes 0–5 and `--output json`. Use [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) and [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md), and keep to small tested PRs.
