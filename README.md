@@ -38,6 +38,7 @@ promptmigrate env add qa
 # model, temperature, tool specs, response schema, etc.
 promptmigrate revision -m "initial assistant prompt"
 promptmigrate history
+promptmigrate plan --env dev --target head
 promptmigrate upgrade head --env dev
 promptmigrate check --env dev --require-head
 promptmigrate get assistant --env dev
@@ -92,6 +93,7 @@ The tool generates a JSON revision like this (abbreviated):
 | `history` | Print revision lineage |
 | `current --env dev` | Display current revision for environment |
 | `upgrade head --env dev` | Apply pending migrations atomically |
+| `plan --env dev [--target head]` | Preview the revisions and config changes an upgrade or downgrade would apply; writes nothing |
 | `downgrade -1 --env dev` | Undo the last applied revision |
 | `downgrade base --env dev` | Revert all applied revisions |
 | `check --env dev --require-head` | Detect drift, tampered migration files, and pending changes |
@@ -131,8 +133,9 @@ docker build -f Dockerfile.ci -t promptmigrate-ci .
 docker run --rm promptmigrate-ci
 ```
 
-CI tests run in Linux containers; this workflow does not provide native
-Windows or macOS test coverage.
+CI runs the complete suite in Linux containers and natively on Windows and
+macOS for Python 3.10, 3.12, and 3.13. Python 3.11 remains covered by the
+local Windows merge gate.
 
 ```yaml
 - run: python -m pip install -e .
@@ -167,7 +170,7 @@ Tests cover revision generation, history, separate environment revisions, determ
 
 ## Suggested roadmap
 
-**v0.2:** evaluators (golden set / schema / security), policy-as-code gates, dry-run plan, required review approvals.
+**v0.2:** evaluators (golden set / schema / security), policy-as-code gates, required review approvals.
 
 **v0.3:** Postgres coordination DB, remote registry adapters, outbox + reconcile loop, reconcile/repair commands, SDK resolution by immutable release manifest.
 

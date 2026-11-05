@@ -80,4 +80,4 @@ No SaaS dashboard, no visual prompt editor, no paid cloud control plane, no dire
 
 ## First next step
 
-Finish Phase 1 cycle 1: exit codes 0–5 and `--output json` (the read-only `plan` command is done). Use [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) and [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md), and keep to small tested PRs.
+Phase 1 cycle 1 is complete. Start cycle 2 with the "Remaining after cycle 1" items above, beginning with protocol v1 and canonical revision hashes. Use [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) and [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md), and keep to small tested PRs.

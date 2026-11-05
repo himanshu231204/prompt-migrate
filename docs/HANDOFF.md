@@ -65,12 +65,14 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 | 2026-10-31 (after PR 3) | Windows 11, Python 3.11.9 | `python -m pytest -q` → `147 passed, 7 skipped, 2 xfailed` |
 | 2026-11-01 (after PR 3b) | Windows 11, Python 3.11.9 | `python -m pytest -q` → `262 passed, 8 skipped, 2 xfailed` |
 | 2026-11-01 (after PR 4) | Windows 11, Python 3.11.9 | `.venv/Scripts/python -m pytest -q -rxXs` → `469 passed, 16 skipped, 33 warnings`; original unittest suite → `Ran 7 tests ... OK` |
+| 2026-11-05 (after PR 5, `plan`) | Linux, Python 3.13.18 | `python -m pytest -q` → `681 passed, 1 skipped, 39 warnings` (Windows/macOS not re-run for this change) |
+| 2026-11-05 (after PR 6) | Windows 11, Python 3.11.9 | `python -m pytest -q` → `713 passed, 18 skipped, 33 warnings`; original unittest suite → `Ran 7 tests ... OK` |
 
-Implemented there: `init`, `revision`, `diff`, `history`, `current`, `upgrade`, `downgrade`, `check`, `get`, `env add`, and `env list`; Git-trackable JSON revisions and declared environment manifest; per-environment **local** SQLite files; read-only inspection; legacy manifest adoption; snapshots; checksums of raw migration files at apply time; state drift detection; one linear history; multi-prompt changes in one SQLite transaction.
+Implemented there: `init`, `revision`, `diff`, `history`, `current`, `plan`, `upgrade`, `downgrade`, `check`, `get`, `env add`, and `env list`; Git-trackable JSON revisions and declared environment manifest; per-environment **local** SQLite files; read-only inspection; legacy manifest adoption; snapshots; checksums of raw migration files at apply time; state drift detection; one linear history; multi-prompt changes in one SQLite transaction.
 
-The PR 4 skips are Windows host limits: symlinks/reparse points cannot be created by this account, and case-colliding SQLite stems cannot coexist on its case-insensitive filesystem. GitHub Actions runs the full suite in Linux Docker containers for Python 3.10, 3.12 and 3.13; it does not run natively on Windows or macOS.
+The Windows skips are host limits: symlinks/reparse points cannot be created by this account, case-colliding file names cannot coexist on its case-insensitive filesystem, and POSIX permission bits do not apply. GitHub Actions runs the full suite in Linux Docker containers and natively on Windows and macOS for Python 3.10, 3.12 and 3.13.
 
-**Not implemented/verified:** strict config schema, `plan`, evaluation gates, external providers, shared production ledger, centralized rollout, distributed consistency, signed artifacts, comprehensive concurrency/fault injection, audit-grade access controls. The prototype's `prod` environment name is only a *local SQLite file*, never a deployment to a production system.
+**Not implemented/verified:** strict config schema, evaluation gates, external providers, shared production ledger, centralized rollout, distributed consistency, signed artifacts, comprehensive concurrency/fault injection, audit-grade access controls. The prototype's `prod` environment name is only a *local SQLite file*, never a deployment to a production system.
 
 ## Guiding architectural rule
 
