@@ -6,4 +6,12 @@ Names are defined in the submodules and re-exported here. Patch a limit on `prot
 from .equality import canonical, same
 from .jsonloader import _PREFIX, _StrictJSONError, _finite_float, _reject_constant, _unique_pairs, load_json
 from .limits import MAX_CONFIG_DEPTH, MAX_CONTROL_FILE_BYTES, MAX_DRAFT_BYTES, MAX_REVISION_BYTES
+from .format import (
+    FORMAT_VERSION_V0,
+    FORMAT_VERSION_V1,
+    KNOWN_FORMAT_VERSIONS,
+    artifact_hash,
+    canonical_artifact_bytes,
+    validate_format_version,
+)
 from .rules import _NAME, RESERVED_TYPES, case_collisions, config_depth, config_violations, validate_config

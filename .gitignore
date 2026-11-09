@@ -2,11 +2,14 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
+.venv-linux/
+.hypothesis/
 .pytest_cache/
 build/
 dist/
 .promptmigrate/states/
-
+.hermes/
+.codex/
 # local-only planning and tool output
 docs/superpowers/
 graphify-out/

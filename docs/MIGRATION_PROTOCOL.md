@@ -37,6 +37,7 @@ File: `.promptmigrate/versions/b2c3d4e5f6a7_improve_sql_agent.json`
   "down_revision": "a1b2c3d4e5f6",
   "message": "Improve SQL agent safety",
   "created_at": "2026-10-29T12:00:00+00:00",
+  "format_version": 1,
   "changes": {
     "sql_agent": {
       "before": {
@@ -61,6 +62,10 @@ File: `.promptmigrate/versions/b2c3d4e5f6a7_improve_sql_agent.json`
 - `down_revision: null` indicates root; later revisions point to immediate predecessor.
 - Existing starter revision ID is 12 lowercase hex chars; file slug is cosmetic.
 - Revision content is declarative data, **not executable Python**.
+- `format_version` (optional): `0` or absent means the starter format — the ledger stores the raw SHA-256 of the
+  on-disk file bytes. `1` means the ledger stores the canonical-artifact SHA-256 (`artifact_sha256`), computed from
+  re-serialized canonical JSON so whitespace-only edits (LF vs CRLF) do not change the hash. Any other value fails
+  closed with `SchemaError`. v0 revisions remain readable and applicable after v1 is introduced.
 
 ## Authoritative state model
 
@@ -155,11 +160,17 @@ The one deliberate tier-A break: a revision hand-edited to rely on `1 == true` n
 
 ## Integrity checks
 
-The current implementation stores `SHA-256(raw revision file bytes)` in the `applied_revisions` ledger. A later change to the file — including whitespace-only modification — will be rejected for environments where that revision was applied.
+The ledger stores the hash appropriate to each artifact's `format_version`:
 
-- This is **tamper detection relative to that environment ledger**, not cryptographic proof of author identity.
-- A future `format_version` field, canonical artifact hashing, manifest signatures, and transparency/audit trail need an explicit migration/compatibility design.
-- Preexisting revisions must remain readable after schema evolution.
+- `format_version` absent or `0` (v0): the ledger stores `SHA-256(raw revision file bytes)`. Any byte change —
+  including whitespace-only modification — is rejected for environments where that revision was applied.
+- `format_version: 1` (v1): the ledger stores `SHA-256(canonical artifact bytes)`, where canonical bytes are the
+  re-serialized JSON (sorted keys, compact separators, UTF-8). Whitespace-only edits (LF vs CRLF) do not change the
+  hash, eliminating the CRLF false-tamper risk; only semantically different content changes the hash.
+
+- The per-artifact hash is **tamper detection relative to that environment ledger**, not cryptographic proof of author identity.
+- v0 revisions remain readable and applicable after v1 is introduced; no applied checksum changes silently.
+- Unknown `format_version` fails closed with `SchemaError`.
 
 ## Environment names
 
@@ -187,6 +198,9 @@ For MVP: at most one root and one child per revision. No merge branches, disconn
 - Never serialize secrets; use references like `secret://provider/credential` where needed. `revision` refuses secret-like values in new content (heuristic; see `SECURITY.md`).
 - Client code and tool schema may need compatibility constraints recorded alongside config.
 
-## Future `format_version` proposal (not implemented)
+## Implemented `format_version` (v1)
 
-Potential fields: `format_version: 1`, `artifact_sha256`, `dependencies`, `metadata`, and `compatibility`. Define canonical serialization bytes, validation, and migration rules before shipping a public stable protocol. Do not add them experimentally without migration tests.
+`format_version: 1` with `artifact_sha256` (canonical-artifact SHA-256) is implemented (PR 7). v0 artifacts keep
+raw-byte SHA-256 ledger checksums; v1 artifacts carry both `checksum` (raw) and `artifact_sha256` (canonical).
+Unknown `format_version` fails closed. v0 revisions remain readable and applicable after v1 is introduced. Do not
+add further format fields experimentally without migration tests.

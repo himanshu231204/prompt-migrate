@@ -27,6 +27,13 @@ def _actual(db: sqlite3.Connection) -> dict[str, dict[str, Any]]:
     ).fetchall()}
 
 
+def _ledger_hash(source: revisions.Revision) -> str:
+    """The hash stored in the ledger for this artifact: canonical (v1) or raw-byte (v0)."""
+    if source.format_version == protocol.FORMAT_VERSION_V1:
+        return source.artifact_sha256  # type: ignore[return-value]
+    return source.checksum
+
+
 def _verify(db: sqlite3.Connection, revisions_: list[revisions.Revision]) -> int:
     try:
         applied = _applied(db)
@@ -38,7 +45,7 @@ def _verify(db: sqlite3.Connection, revisions_: list[revisions.Revision]) -> int
         source = revisions_[index]
         if rid != source.revision:
             raise IntegrityError(f"Applied revisions diverge from source history at index {index}")
-        if checksum != source.checksum:
+        if checksum != _ledger_hash(source):
             raise IntegrityError(f"Migration file was modified after apply: {rid}")
     expected = revisions.replay_revisions(revisions_[:len(applied)])
     try:
@@ -76,5 +83,5 @@ def migrate(db: sqlite3.Connection, steps: list[revisions.Revision], *, backward
         else:
             db.execute(
                 "INSERT INTO applied_revisions(revision, checksum, applied_at) VALUES(?, ?, ?)",
-                (r.revision, r.checksum, datetime.now(timezone.utc).isoformat()),
+                (r.revision, _ledger_hash(r), datetime.now(timezone.utc).isoformat()),
             )

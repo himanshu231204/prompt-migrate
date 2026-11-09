@@ -33,7 +33,7 @@
 
 ### Remaining after cycle 1 (cycle 2+)
 
-- [ ] Freeze v0.x artifact semantics formally; protocol v1 with canonical revision hashes (fixes the CRLF false-tamper risk).
+- [x] Freeze v0.x artifact semantics formally; protocol v1 with canonical revision hashes (fixes the CRLF false-tamper risk). (PR 7)
 - [ ] Atomic revision file generation and collision handling.
 - [ ] `validate` command.
 - [ ] Concurrency tests and the fault-injection suite.
@@ -80,4 +80,4 @@ No SaaS dashboard, no visual prompt editor, no paid cloud control plane, no dire
 
 ## First next step
 
-Phase 1 cycle 1 is complete. Start cycle 2 with the "Remaining after cycle 1" items above, beginning with protocol v1 and canonical revision hashes. Use [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) and [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md), and keep to small tested PRs.
+Phase 1 cycle 1 is complete; protocol v1 and canonical revision hashes are done (PR 7). Continue cycle 2 with the next "Remaining after cycle 1" item: atomic revision file generation and collision handling (PR 8). Use [IMPLEMENTATION_PLAN_CYCLE2.md](IMPLEMENTATION_PLAN_CYCLE2.md) and [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md), and keep to small tested PRs.

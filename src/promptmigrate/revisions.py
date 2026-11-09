@@ -22,8 +22,10 @@ class Revision:
     message: str
     created_at: str
     changes: dict[str, dict[str, Any]]
-    checksum: str
+    checksum: str          # SHA-256 of raw file bytes (v0 ledger value; always present)
     path: Path
+    format_version: int = 0          # 0 = starter/raw-byte semantics; 1 = canonical artifact hash
+    artifact_sha256: str | None = None  # canonical SHA-256 (v1 only); None for v0
 
 
 def _hash(data: bytes) -> str:
@@ -47,6 +49,7 @@ def load_revisions(project_dir: Path) -> list[Revision]:
             raise SchemaError(f"Invalid down_revision in {path.name}")
         if not isinstance(item["message"], str) or not isinstance(item["created_at"], str):
             raise SchemaError(f"Invalid metadata in {path.name}")
+        format_version = protocol.validate_format_version(item.get("format_version"), path.name)
         if not isinstance(changes, dict) or not changes:
             raise SchemaError(f"Migration must contain nonempty changes: {path.name}")
         for name, change in changes.items():
@@ -65,8 +68,19 @@ def load_revisions(project_dir: Path) -> list[Revision]:
             if change["after"] is not None:
                 found.extend(protocol.config_violations(name, change["after"]))
         violations[rid] = found
+        artifact_sha256 = (
+            protocol.artifact_hash(raw, format_version) if format_version == protocol.FORMAT_VERSION_V1 else None
+        )
         unsorted[rid] = Revision(
-            rid, parent, item["message"], item["created_at"], changes, _hash(raw), path
+            rid,
+            parent,
+            item["message"],
+            item["created_at"],
+            changes,
+            _hash(raw),
+            path,
+            format_version=format_version,
+            artifact_sha256=artifact_sha256,
         )
 
     if not unsorted:

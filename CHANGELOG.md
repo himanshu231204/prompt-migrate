@@ -4,6 +4,7 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
 
 ## Unreleased
 
+- **Protocol v1 + canonical revision hashes (PR 7):** added an explicit `format_version` field to revision artifacts. v0 artifacts (no field / `0`) keep raw-byte SHA-256 ledger checksums unchanged. v1 artifacts (`format_version: 1`) carry a canonical-artifact SHA-256 (`artifact_sha256`) computed from re-serialized canonical JSON, eliminating the CRLF/whitespace false-tamper risk. A tested reader/migration path keeps v0 revisions readable and applicable after the format evolves. Unknown `format_version` fails closed with `SchemaError` (resolves Open Questions Q1 and Q4).
 - Corrected README and handoff documentation to include the shipped `plan` command and native Windows/macOS CI coverage; refreshed the documented test baseline and suite location. Brought `PRD.md`, `ROADMAP.md` and `LOW_LEVEL_DESIGN.md` up to date with the shipped `plan`, exit codes, JSON output, typed errors and strict loader. Moved all agent rules and the architecture overview from `CLAUDE.md` into `AGENTS.md`.
 - Compacted `AGENTS.md` without dropping rules, and added a "Before every commit" rule: each commit updates `CHANGELOG.md` and `docs/ROADMAP.md`.
 

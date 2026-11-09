@@ -18,10 +18,27 @@ Each ADR documents a decision and its rationale. **Confirmed** means the convers
 
 ## ADR-003 — JSON declarative revisions
 
-**Status:** recommended and implemented in starter.  
-**Decision:** JSON config drafts and immutable-in-practice before/after snapshots; no executable migrations.  
-**Why:** readable Git diffs, deterministic replay, safer review.  
-**Tradeoff:** larger files, schema evolution, need to scan for secrets.
+**Status:** recommended and implemented in starter.  **Updated:** PR 7. 
+**Decision:** JSON config drafts and immutable-in-practice before/after snapshots; no executable migrations. 
+**Why:** readable Git diffs, deterministic replay, safer review. 
+**Tradeoff:** larger files, schema evolution, need to scan for secrets. 
+**Update (PR 7):** revision artifacts carry an optional `format_version` field. `0` or absent = starter format with raw-byte
+SHA-256 ledger checksum (unchanged behavior, backward compatible). `1` = canonical-artifact SHA-256 (`artifact_sha256`)
+computed from re-serialized canonical JSON, eliminating CRLF/whitespace false-tamper. Unknown `format_version` fails closed.
+v0 revisions remain readable and applicable after v1 is introduced; no applied checksum changes silently.
+
+## ADR-003b — Canonical artifact hashing for v1 revisions
+
+**Status:** implemented (PR 7). 
+**Decision:** v1 revision artifacts (`format_version: 1`) store `SHA-256(canonical artifact bytes)` in the ledger, where
+canonical bytes are re-serialized JSON (sorted keys, compact separators, UTF-8). v0 artifacts keep raw-byte SHA-256. 
+The `Revision` dataclass carries both `checksum` (raw, always present) and `artifact_sha256` (v1 only). `apply._ledger_hash`
+selects the correct hash per format version for both verification and ledger writes. 
+**Why:** v0 raw-byte checksums flag whitespace-only edits (LF vs CRLF) as tampering, causing false positives when files
+are checked out with different line endings. Canonical hashing normalizes whitespace so only semantically different
+content changes the hash, while v0 behavior is preserved for existing applied revisions.
+**Consequence:** v0 applied checksums are unchanged; v1 whitespace-only edits are not flagged; real content changes are
+still detected. Unknown `format_version` raises `SchemaError` before any state write.
 
 ## ADR-003a — Canonical equality
 
