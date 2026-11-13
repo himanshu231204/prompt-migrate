@@ -165,3 +165,17 @@ def test_stdout_write_failure_is_a_storage_error(project, capsys, monkeypatch, f
     code = cli.main(["--project", str(project), "--output", fmt, "history"])
     assert code == 5
     assert capsys.readouterr().err.startswith("Error: ")
+
+
+@pytest.mark.parametrize("value", [0, 2, True, 1.0, "1"])
+def test_unsupported_format_version_is_3(project, capsys, value):
+    write_revision(project, "a" * 12, None, {"assistant": create()}, format_version=value)
+    code, _, err = run(capsys, project, "history")
+    assert (code, err) == (3, "Error: Unsupported format_version in aaaaaaaaaaaa.json\n")
+
+
+def test_unknown_v1_top_level_key_is_3(project, capsys):
+    path = write_revision(project, "a" * 12, None, {"assistant": create()}, format_version=1)
+    path.write_text(json.dumps({**json.loads(path.read_bytes()), "author": "x"}), encoding="utf-8")
+    code, _, err = run(capsys, project, "check", "--env", "dev")
+    assert (code, err) == (3, "Error: Unknown top-level key in aaaaaaaaaaaa.json: author\n")

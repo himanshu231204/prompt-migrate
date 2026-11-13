@@ -14,6 +14,9 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
   `v1:`-tagged SHA-256 of the canonical parsed object as checksum, so line endings, whitespace and key order no
   longer count for them. Any other `format_version` value, or an unknown key in a v1 file, is a `SchemaError`
   (exit 3). Files without `format_version` stay v0, unchanged.
+- Added v1 integrity tests: re-saved v1 revisions still verify, value edits fail closed, mixed v0 → v1 histories
+  upgrade, check and downgrade, an I16 property test over random re-serializations, and plan==apply over mixed
+  histories.
 
 ### Phase 1 cycle 2 — freeze v0 artifact semantics (PR 7)
 
