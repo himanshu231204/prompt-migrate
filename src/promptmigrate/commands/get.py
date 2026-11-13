@@ -19,7 +19,7 @@ def get_config(project_dir: Path, env: str, name: str) -> dict[str, Any]:
         if db is None:
             row = None
         else:
-            apply._verify(db, revisions_)
+            apply._verify(db, revisions_, env)
             row = db.execute("SELECT config FROM prompts WHERE name=?", (name,)).fetchone()
     if not row:
         raise TargetError(f"No prompt named {name!r} in environment {env!r}")

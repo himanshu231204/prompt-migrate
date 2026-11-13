@@ -15,6 +15,8 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
   checksum of applied v0 revisions whose file changed only in line endings (CRLF ↔ LF). Any other mismatch, a v1 row,
   or drift fails with the normal error and writes nothing; no state database or manifest is created. There is no
   audit record of a re-stamp yet (cycle 3).
+- `check`, `current`, `get`, `plan`, `upgrade` and `downgrade` still fail a v0 revision whose file changed only in
+  line endings (exit 4), but the message now says so and names `promptmigrate restamp --env <env>`.
 
 ### Phase 1 cycle 2 — protocol v1 and canonical revision hashes (PR 8)
 

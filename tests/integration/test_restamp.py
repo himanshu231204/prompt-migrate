@@ -19,6 +19,8 @@ from promptmigrate.errors import DriftError, EnvironmentNotDeclaredError, Integr
 
 A, B = "a" * 12, "b" * 12
 PINS = json.loads((FIXTURES / "v0_checksums.json").read_text(encoding="utf-8"))
+HINT = ("Migration file was modified after apply: {rid} (line endings only; "
+        "run `promptmigrate restamp --env dev` to accept)")
 
 
 def db_path(project, env="dev"):
@@ -218,3 +220,17 @@ def test_restamp_defaults_to_dev(project, capsys):
 
 def test_core_facade_exports_restamp():
     assert core.restamp is restamp
+
+
+@pytest.mark.parametrize("argv", [
+    ["check", "--env", "dev"], ["current", "--env", "dev"], ["get", "assistant", "--env", "dev"],
+    ["plan", "--env", "dev"],
+])
+def test_read_commands_never_restamp(project, capsys, argv):
+    """I5: a read command reports the line-ending-only case but changes nothing; `restamp` still has work."""
+    applied_then_swapped(project)
+    before = tree_snapshot(project)
+    code, _out, err = run_cli(capsys, project, *argv)
+    assert code == 4 and HINT.format(rid=A) in err
+    assert tree_snapshot(project) == before
+    assert restamp(project, "dev") == [A]

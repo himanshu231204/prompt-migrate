@@ -87,6 +87,10 @@ unknown top-level key (`Unknown top-level key in <file>: <keys>`), or a string w
 (`Invalid string in <file>: unpaired surrogate`) are `SchemaError`s and exit 3 (see `MIGRATION_PROTOCOL.md`,
 "v1 artifact").
 
+A v0 revision whose file changed only in line endings after apply is still an `IntegrityError` (exit 4) in every
+command that verifies an environment (`check`, `current`, `get`, `plan`, `upgrade`, `downgrade`, `restamp`), with the
+message ``Migration file was modified after apply: <id> (line endings only; run `promptmigrate restamp --env <env>` to accept)``.
+
 **Warnings:** each distinct warning is printed once per invocation to stderr as `Warning: <message>`, before any
 `Error: …` line. Warnings never change the exit code. Warnings come from existing revision files that break a tier-B
 rule (see `MIGRATION_PROTOCOL.md`, "Strict parsing and compatibility tiers") and from the secret safeguard (redaction,

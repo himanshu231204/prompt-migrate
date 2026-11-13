@@ -42,10 +42,14 @@ def _ledger_rows(db: sqlite3.Connection, revisions_: list[revisions.Revision]) -
         yield revisions_[index], checksum
 
 
-def _verify(db: sqlite3.Connection, revisions_: list[revisions.Revision]) -> int:
+def _verify(db: sqlite3.Connection, revisions_: list[revisions.Revision], env: str | None = None) -> int:
     count = 0
     for source, checksum in _ledger_rows(db, revisions_):
         if checksum != source.checksum:
+            if checksum in source.line_ending_checksums:
+                # Diagnosis only: the row still fails closed until `restamp` accepts it (ADR-027).
+                raise IntegrityError(f"Migration file was modified after apply: {source.revision} (line endings only; "
+                                     f"run `promptmigrate restamp --env {env or '<env>'}` to accept)")
             raise IntegrityError(f"Migration file was modified after apply: {source.revision}")
         count += 1
     expected = revisions.replay_revisions(revisions_[:count])

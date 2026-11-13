@@ -23,7 +23,7 @@ def restamp(project_dir: Path, env: str) -> list[str]:
         stale = apply.line_ending_only(db, revisions_)
         for r in stale:
             db.execute("UPDATE applied_revisions SET checksum=? WHERE revision=?", (r.checksum, r.revision))
-        apply._verify(db, revisions_)
+        apply._verify(db, revisions_, env)
     return [r.revision for r in stale]
 
 

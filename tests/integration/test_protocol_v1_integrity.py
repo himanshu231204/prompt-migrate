@@ -116,8 +116,10 @@ def test_mixed_chain_line_endings_matter_only_for_v0(mixed):
     swap_line_endings(versions / f"{C}.json")
     assert check(mixed, "dev") == (3, 3)
     swap_line_endings(versions / f"{A}_create.json")
-    with pytest.raises(IntegrityError, match=f"^Migration file was modified after apply: {A}$"):
+    with pytest.raises(IntegrityError) as caught:
         check(mixed, "dev")
+    assert str(caught.value) == (f"Migration file was modified after apply: {A} (line endings only; "
+                                 "run `promptmigrate restamp --env dev` to accept)")
 
 
 # --- I16 property: any re-serialization of the same object keeps the v1 checksum -----------------

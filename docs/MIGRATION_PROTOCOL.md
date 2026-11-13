@@ -200,6 +200,10 @@ A revision file whose top-level `format_version` is the JSON integer `1` is v1 (
 Every command that verifies an environment compares the ledger, row by row, with the checksums of the current source
 files. A mismatch is `IntegrityError` "Migration file was modified after apply: <id>" (exit 4).
 
+When a v0 row's stored digest equals the current file re-saved with LF or with CRLF, the error and exit code are the
+same and the message ends `` (line endings only; run `promptmigrate restamp --env <env>` to accept)``. Nothing is
+accepted until `restamp` runs (see "v0 artifact (frozen)").
+
 | Format | Ledger value | A mismatch after apply means |
 |---|---|---|
 | v0 | 64 hex digits: SHA-256 of the raw file bytes | any byte changed, whitespace and line endings included |
