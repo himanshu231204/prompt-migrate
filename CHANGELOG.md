@@ -21,6 +21,7 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
   which fixes the CRLF false-tamper risk for new revisions (the PR 7 xfail now passes). PromptMigrate versions without
   v1 support still load these files but treat them as v0 and store raw-byte checksums, so use one version per
   environment: mixing them fails closed with "Migration file was modified after apply".
+- Recorded the post-PR 8 test baseline (799 passed, 18 skipped) and marked open questions 1 and 4 answered.
 
 ### Phase 1 cycle 2 — freeze v0 artifact semantics (PR 7)
 

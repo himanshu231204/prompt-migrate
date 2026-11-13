@@ -18,7 +18,7 @@
 
 ## Phase 1 — Harden migration core (first implementation priority)
 
-**Status:** in progress. Phase 1 is delivered in cycles. Cycle 1 is complete; cycle 2 has started (v0 semantics frozen, ADR-025). Finishing cycle 2 does **not** finish Phase 1.
+**Status:** in progress. Phase 1 is delivered in cycles. Cycle 1 is complete; cycle 2 is under way (v0 frozen, ADR-025; protocol v1, ADR-026). Finishing cycle 2 does **not** finish Phase 1.
 
 ### Cycle 1 (PRs 1–6 + 3b)
 
@@ -33,9 +33,8 @@
 
 ### Remaining after cycle 1 (cycle 2+)
 
-- [ ] Freeze v0.x artifact semantics formally; protocol v1 with canonical revision hashes (fixes the CRLF false-tamper risk).
-  - 2026-11-13: v0 semantics frozen and pinned by fixtures (ADR-025). Protocol v1 still open. Baseline after PR 7: 741 passed, 18 skipped, 1 xfailed.
-  - Protocol v1 shipped (ADR-026): reader, canonical checksum, and `revision` writes v1 with LF line endings.
+- [x] Freeze v0.x artifact semantics formally; protocol v1 with canonical revision hashes (fixes the CRLF false-tamper risk).
+  - 2026-11-13: v0 frozen (ADR-025); protocol v1 with canonical checksums shipped, and new revisions are v1 with LF line endings (ADR-026). Baseline after PR 8: 799 passed, 18 skipped.
 - [ ] Atomic revision file generation and collision handling.
 - [ ] `validate` command.
 - [ ] Concurrency tests and the fault-injection suite.
@@ -82,4 +81,4 @@ No SaaS dashboard, no visual prompt editor, no paid cloud control plane, no dire
 
 ## First next step
 
-Phase 1 cycle 2 is under way. v0 artifact semantics are frozen (ADR-025). Next: protocol v1 with canonical revision hashes, which removes the CRLF false-tamper risk for new revisions. Use [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) and [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md), and keep to small tested PRs.
+Phase 1 cycle 2 is under way. Protocol v1 is shipped (ADR-026), so new revisions are immune to line-ending changes. Next: an explicit, opt-in `restamp` for v0 ledger rows whose mismatch is line endings only (v0 hash semantics unchanged). Use [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) and [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md), and keep to small tested PRs.
