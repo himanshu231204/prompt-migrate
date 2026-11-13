@@ -1,0 +1,20 @@
+{
+  "revision": "aaaaaaaaaaaa",
+  "down_revision": null,
+  "message": "Extra key",
+  "created_at": "2026-10-30T00:00:00+00:00",
+  "changes": {
+    "assistant": {
+      "before": null,
+      "after": {
+        "messages": [
+          {
+            "role": "system",
+            "content": "Answer briefly."
+          }
+        ]
+      }
+    }
+  },
+  "author": "fixture"
+}

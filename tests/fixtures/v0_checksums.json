@@ -1,0 +1,8 @@
+{
+  "v0_frozen/basic/aaaaaaaaaaaa_create.json": "33318581ec932eab0513a1ad287283e7fc230303a59db2e5eeac68465462b30e",
+  "v0_frozen/basic/bbbbbbbbbbbb_update.json": "9da7e02c662bfdb1cb249b5543d84b0308c8516a214a78710582bd8cb45771fd",
+  "v0_frozen/extra_key/aaaaaaaaaaaa_extra_key.json": "62b17516f163cb2708f5060b4aca0570aec8aa3843cf856444473635a6b34025",
+  "v0_frozen/bom/aaaaaaaaaaaa_bom.json": "ab6177996a907a8dff10f929a8f9f12f55046977eb97d7e0b659299748c8514c",
+  "crlf/lf/aaaaaaaaaaaa_create.json": "33318581ec932eab0513a1ad287283e7fc230303a59db2e5eeac68465462b30e",
+  "crlf/crlf/aaaaaaaaaaaa_create.json": "dae7b6f1e0ad50cea95e6c9f12259231dcd5ab43f36e077b320f0d5d5e47a858"
+}

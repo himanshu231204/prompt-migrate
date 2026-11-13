@@ -1,2 +1,4 @@
 * text=auto eol=lf
 *.sqlite3 binary
+tests/fixtures/v0_frozen/** -text
+tests/fixtures/crlf/** -text
