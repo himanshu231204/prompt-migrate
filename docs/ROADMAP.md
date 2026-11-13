@@ -18,7 +18,7 @@
 
 ## Phase 1 — Harden migration core (first implementation priority)
 
-**Status:** in progress. Phase 1 is delivered in cycles. Finishing cycle 1 does **not** finish Phase 1.
+**Status:** in progress. Phase 1 is delivered in cycles. Cycle 1 is complete; cycle 2 has started (v0 semantics frozen, ADR-025). Finishing cycle 2 does **not** finish Phase 1.
 
 ### Cycle 1 (PRs 1–6 + 3b)
 
@@ -34,6 +34,7 @@
 ### Remaining after cycle 1 (cycle 2+)
 
 - [ ] Freeze v0.x artifact semantics formally; protocol v1 with canonical revision hashes (fixes the CRLF false-tamper risk).
+  - 2026-11-13: v0 semantics frozen and pinned by fixtures (ADR-025). Protocol v1 still open. Baseline after PR 7: 741 passed, 18 skipped, 1 xfailed.
 - [ ] Atomic revision file generation and collision handling.
 - [ ] `validate` command.
 - [ ] Concurrency tests and the fault-injection suite.
@@ -80,4 +81,4 @@ No SaaS dashboard, no visual prompt editor, no paid cloud control plane, no dire
 
 ## First next step
 
-Phase 1 cycle 1 is complete. Start cycle 2 with the "Remaining after cycle 1" items above, beginning with protocol v1 and canonical revision hashes. Use [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) and [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md), and keep to small tested PRs.
+Phase 1 cycle 2 is under way. v0 artifact semantics are frozen (ADR-025). Next: protocol v1 with canonical revision hashes, which removes the CRLF false-tamper risk for new revisions. Use [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) and [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md), and keep to small tested PRs.
