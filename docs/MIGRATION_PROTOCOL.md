@@ -153,6 +153,23 @@ because the new `after` is what fixes it.
 
 The one deliberate tier-A break: a revision hand-edited to rely on `1 == true` now fails its precondition.
 
+## v0 artifact (frozen)
+
+A revision file without `format_version` is v0. Its semantics are frozen (ADR-025):
+
+- required top-level keys: `revision`, `down_revision`, `message`, `created_at`, `changes`; any other top-level key
+  is tolerated and ignored
+- `revision` and a non-null `down_revision` are 12 lowercase hex characters; `message` and `created_at` are strings
+- `changes` is a non-empty object of `{before, after}` snapshots, with the rules in "Revision artifact" above
+- the file is read as bytes, so a UTF-8 BOM is accepted, and the BOM is part of the hashed bytes
+- checksum: SHA-256 of the raw file bytes. Any byte change after apply, including line endings or whitespace, blocks
+  that environment with "Migration file was modified after apply"
+
+Known risk: the generator writes the platform's line ending, but if Git normalises revision files to LF (for example
+`* text=auto eol=lf`, or a checkout on another OS), a revision created and applied on Windows can therefore fail
+`check` after a checkout. Protocol v1 is planned to remove this for new revisions; until then, apply revisions only
+after they are committed and checked out again.
+
 ## Integrity checks
 
 The current implementation stores `SHA-256(raw revision file bytes)` in the `applied_revisions` ledger. A later change to the file — including whitespace-only modification — will be rejected for environments where that revision was applied.

@@ -7,6 +7,14 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
 - Corrected README and handoff documentation to include the shipped `plan` command and native Windows/macOS CI coverage; refreshed the documented test baseline and suite location. Brought `PRD.md`, `ROADMAP.md` and `LOW_LEVEL_DESIGN.md` up to date with the shipped `plan`, exit codes, JSON output, typed errors and strict loader. Moved all agent rules and the architecture overview from `CLAUDE.md` into `AGENTS.md`.
 - Compacted `AGENTS.md` without dropping rules, and added a "Before every commit" rule: each commit updates `CHANGELOG.md` and `docs/ROADMAP.md`.
 
+### Phase 1 cycle 2 — freeze v0 artifact semantics (PR 7)
+
+- Recorded ADR-025: a revision file without `format_version` is v0, its meaning is frozen, and its checksum stays
+  SHA-256 of the raw bytes. Added byte-exact v0 and CRLF fixtures with pinned checksums and characterization tests.
+  The CRLF false-tamper risk is now documented in `MIGRATION_PROTOCOL.md` and pinned as a strict xfail.
+  No code, CLI, file-format or checksum change.
+- Recorded the post-PR 7 test baseline in TESTING_STRATEGY.md and HANDOFF.md, and clarified the v0 line-ending risk wording.
+
 ### Phase 1 cycle 1 — exit codes and `--output json` (PR 6)
 
 - **Contract:** handled errors now exit by type: 3 for schema/source errors, 4 for drift, integrity and conflicts, 5
