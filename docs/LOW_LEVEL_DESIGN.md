@@ -92,7 +92,8 @@ Current starter:
 def canonical(obj):
     return json.dumps(obj, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
 
-revision_checksum = sha256(path.read_bytes()).hexdigest()
+revision_checksum = sha256(path.read_bytes()).hexdigest()  # v0 (no format_version)
+revision_checksum = "v1:" + sha256(canonical(item).encode("utf-8")).hexdigest()  # v1 (ADR-026)
 ```
 
 - JSON state comparison is **semantic object equality**.
@@ -113,6 +114,7 @@ Validation:
 6. `changes` is nonempty; each operation has exactly `before` and `after`.
 7. Each prompt name is legal; each non-null config is JSON object with minimally valid messages.
 8. Replay of **all** source revisions from empty state succeeds, validating each precondition.
+9. `format_version` absent -> v0; integer `1` -> v1 with exactly six top-level keys; anything else -> `SchemaError`.
 
 The current starter does minimal config validation; hardening must add a strict, versioned schema (see [MIGRATION_PROTOCOL.md](MIGRATION_PROTOCOL.md)).
 

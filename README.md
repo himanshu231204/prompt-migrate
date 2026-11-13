@@ -68,6 +68,7 @@ The tool generates a JSON revision like this (abbreviated):
 
 ```json
 {
+  "format_version": 1,
   "revision": "0123456789ab",
   "down_revision": null,
   "message": "initial assistant",

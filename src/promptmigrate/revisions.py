@@ -86,7 +86,13 @@ def load_revisions(project_dir: Path) -> list[Revision]:
             if change["after"] is not None:
                 found.extend(protocol.config_violations(name, change["after"]))
         violations[rid] = found
-        checksum = _hash(raw) if version == 0 else _v1_checksum(item)
+        if version == 0:
+            checksum = _hash(raw)
+        else:
+            try:
+                checksum = _v1_checksum(item)
+            except UnicodeEncodeError as exc:
+                raise SchemaError(f"Invalid string in {path.name}: unpaired surrogate") from exc
         unsorted[rid] = Revision(
             rid, parent, item["message"], item["created_at"], changes, checksum, path, version
         )

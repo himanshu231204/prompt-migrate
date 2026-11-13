@@ -33,8 +33,8 @@
 
 ### Remaining after cycle 1 (cycle 2+)
 
-- [x] Freeze v0.x artifact semantics formally; protocol v1 with canonical revision hashes (fixes the CRLF false-tamper risk).
-  - 2026-11-13: v0 frozen (ADR-025); protocol v1 with canonical checksums shipped, and new revisions are v1 with LF line endings (ADR-026). Baseline after PR 8: 799 passed, 18 skipped.
+- [x] Freeze v0.x artifact semantics formally; protocol v1 with canonical revision hashes (fixes the CRLF false-tamper risk for new revisions).
+  - 2026-11-13: v0 frozen (ADR-025); protocol v1 with canonical checksums shipped, and new revisions are v1 with LF line endings (ADR-026). Baseline after PR 8: 802 passed, 18 skipped.
 - [ ] Atomic revision file generation and collision handling.
 - [ ] `validate` command.
 - [ ] Concurrency tests and the fault-injection suite.

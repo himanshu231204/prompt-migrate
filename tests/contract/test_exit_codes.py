@@ -179,3 +179,22 @@ def test_unknown_v1_top_level_key_is_3(project, capsys):
     path.write_text(json.dumps({**json.loads(path.read_bytes()), "author": "x"}), encoding="utf-8")
     code, _, err = run(capsys, project, "check", "--env", "dev")
     assert (code, err) == (3, "Error: Unknown top-level key in aaaaaaaaaaaa.json: author\n")
+
+
+def test_unpaired_surrogate_in_v1_is_3(project, capsys):
+    item = {
+        "format_version": 1,
+        "revision": "a" * 12,
+        "down_revision": None,
+        "message": "x\udc80",
+        "created_at": "2026-10-30T00:00:00+00:00",
+        "changes": {"assistant": create()},
+    }
+    path = pm_dir(project) / "versions" / "aaaaaaaaaaaa.json"
+    path.write_bytes(json.dumps(item).encode("ascii"))
+    code, _, err = run(capsys, project, "history")
+    assert (code, err) == (3, "Error: Invalid string in aaaaaaaaaaaa.json: unpaired surrogate\n")
+
+    code, out, err = run(capsys, project, "--output", "json", "history")
+    assert code == 3
+    json.loads(out)

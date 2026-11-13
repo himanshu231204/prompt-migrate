@@ -91,6 +91,23 @@ def test_v1_file_loads_without_warnings(project):
     assert warned == []
 
 
+# --- unpaired surrogate: cannot be canonicalised, so it is a tier-A SchemaError --------------------
+
+def test_unpaired_surrogate_in_v1_message_is_schema_error(project):
+    put(project, json.dumps(v1_doc(message="x\udc80")).encode("ascii"))
+    with pytest.raises(SchemaError, match=r"^Invalid string in aaaaaaaaaaaa\.json: unpaired surrogate$"):
+        load_revisions(project)
+
+
+def test_unpaired_surrogate_in_v0_message_still_loads(project):
+    item = v1_doc(message="x\udc80")
+    del item["format_version"]
+    put(project, json.dumps(item).encode("ascii"))
+    [revision] = load_revisions(project)
+    assert revision.format_version == 0
+    assert revision.message == "x\udc80"
+
+
 # --- I16: the v1 checksum ignores serialization and follows every value ---------------------------
 
 @pytest.mark.parametrize("variant", sorted(VARIANTS))

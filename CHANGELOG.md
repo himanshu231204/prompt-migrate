@@ -10,10 +10,11 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
 
 ### Phase 1 cycle 2 — protocol v1 and canonical revision hashes (PR 8)
 
-- Revision files with `"format_version": 1` are read as protocol v1 (ADR-026): exactly six top-level keys, and a
+- **Contract:** Revision files with `"format_version": 1` are read as protocol v1 (ADR-026): exactly six top-level keys, and a
   `v1:`-tagged SHA-256 of the canonical parsed object as checksum, so line endings, whitespace and key order no
   longer count for them. Any other `format_version` value, or an unknown key in a v1 file, is a `SchemaError`
-  (exit 3). Files without `format_version` stay v0, unchanged.
+  (exit 3). Files without `format_version` stay v0, unchanged. A hand-written revision that already carried a
+  `format_version` key used to load as v0 and now follows these rules.
 - Added v1 integrity tests: re-saved v1 revisions still verify, value edits fail closed, mixed v0 → v1 histories
   upgrade, check and downgrade, an I16 property test over random re-serializations, and plan==apply over mixed
   histories.
@@ -21,7 +22,8 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
   which fixes the CRLF false-tamper risk for new revisions (the PR 7 xfail now passes). PromptMigrate versions without
   v1 support still load these files but treat them as v0 and store raw-byte checksums, so use one version per
   environment: mixing them fails closed with "Migration file was modified after apply".
-- Recorded the post-PR 8 test baseline (799 passed, 18 skipped) and marked open questions 1 and 4 answered.
+- Recorded the post-PR 8 test baseline (802 passed, 18 skipped) and marked open questions 1 and 4 answered.
+- Unpaired surrogate escapes in a v1 revision are now a SchemaError (exit 3) instead of a traceback; refreshed the README example and v1 design notes.
 
 ### Phase 1 cycle 2 — freeze v0 artifact semantics (PR 7)
 

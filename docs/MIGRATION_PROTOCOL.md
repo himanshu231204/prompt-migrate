@@ -188,6 +188,8 @@ A revision file whose top-level `format_version` is the JSON integer `1` is v1 (
   `format_version`, because the file then becomes v0
 - generator: `revision` writes v1, UTF-8 with LF line endings on every OS; the 16 MiB size check counts those exact
   bytes
+- a string containing an unpaired UTF-16 surrogate escape (for example `"\udc80"`) cannot be canonicalised and is a
+  tier-A error: `Invalid string in <file>: unpaired surrogate`
 
 ## Integrity checks
 
