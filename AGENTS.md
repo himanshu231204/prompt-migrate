@@ -22,7 +22,7 @@ Flow: `load_revisions()` enforces one linear chain and replays it from `{}`. `re
 ## Verified baseline (2026-11-13)
 
 - Shipped: `init`, `revision`, `history`, `diff`, `current`, `upgrade`, `downgrade`, `plan`, `check`, `restamp`, `get`, `env add`, `env list`; `--output json`; exit codes 0–5.
-- Windows 11 / Python 3.11.9: `python -m pytest -q` → `850 passed, 18 skipped, 33 warnings` (host symlink, case-insensitivity and POSIX-permission skips); unittest → `Ran 7 tests ... OK`. CI: Linux Docker plus native Windows and macOS, Python 3.10/3.12/3.13.
+- Windows 11 / Python 3.11.9: `python -m pytest -q` → `854 passed, 18 skipped, 33 warnings` (host symlink, case-insensitivity and POSIX-permission skips); unittest → `Ran 7 tests ... OK`. CI: Linux Docker plus native Windows and macOS, Python 3.10/3.12/3.13.
 - Not shipped (never claim otherwise): `eval`, `export`, `promote`, `reconcile`, cloud adapters, SDK, Postgres, RBAC, signed revisions, real production activation.
 
 ## Process

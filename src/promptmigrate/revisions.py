@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import warnings
 from dataclasses import dataclass
@@ -96,7 +97,16 @@ def load_revisions(project_dir: Path) -> list[Revision]:
         variants: frozenset[str] = frozenset()
         if version == 0:
             checksum = _hash(raw)
-            variants = frozenset(line_ending_variants(raw))
+            # CR/LF bytes (b"\r\n") are only ever whitespace in UTF-8 JSON. `json.loads` also auto-detects and
+            # accepts UTF-16/32, where a single code unit such as U+0D0A encodes as the same two bytes as a byte-
+            # level CR LF; replacing it would treat a real value change as a line-ending-only edit (Finding 1,
+            # 2026-11-13 final review). `raw.decode("utf-8")` alone is not a reliable test here: a mostly-ASCII
+            # UTF-16 file is full of null bytes, which are themselves valid (if meaningless) UTF-8, so it can
+            # decode without error even though `json.loads` did not read it as UTF-8. Ask the same question
+            # `json.loads` asks of these bytes (`json.detect_encoding`, the encoding-sniffing it uses for bytes
+            # input) instead, so "UTF-8" here means what it means to the loader, with or without a BOM.
+            if json.detect_encoding(raw) in ("utf-8", "utf-8-sig"):
+                variants = frozenset(line_ending_variants(raw))
         else:
             try:
                 checksum = _v1_checksum(item)

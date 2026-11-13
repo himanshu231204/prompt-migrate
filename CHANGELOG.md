@@ -17,7 +17,9 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
   audit record of a re-stamp yet (cycle 3).
 - `check`, `current`, `get`, `plan`, `upgrade` and `downgrade` still fail a v0 revision whose file changed only in
   line endings (exit 4), but the message now says so and names `promptmigrate restamp --env <env>`.
-- Recorded the post-PR 9 test baseline (850 passed, 18 skipped) and added `restamp` to the command lists.
+- `restamp` and the line-ending hint now apply only to UTF-8 v0 revision files; a UTF-16/32 file whose bytes happen
+  to match after CR/LF replacement is no longer accepted.
+- Recorded the post-PR 9 test baseline (854 passed, 18 skipped) and added `restamp` to the command lists.
 
 ### Phase 1 cycle 2 — protocol v1 and canonical revision hashes (PR 8)
 

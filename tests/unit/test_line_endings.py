@@ -9,7 +9,7 @@ import json
 
 import pytest
 
-from pmtest import FIXTURES, install_fixture, manifest, pm_dir, run_cli, swap_line_endings
+from pmtest import CFG, FIXTURES, install_fixture, manifest, pm_dir, run_cli, swap_line_endings
 from promptmigrate import apply, store
 from promptmigrate.core import check, load_revisions, revision, upgrade
 from promptmigrate.errors import IntegrityError
@@ -66,6 +66,48 @@ def test_v1_revision_has_no_line_ending_checksums(project):
     created = revision(project, "initial")
     assert created.format_version == 1
     assert created.line_ending_checksums == frozenset()
+
+
+def _v0_item(message="m"):
+    return {
+        "revision": "a" * 12,
+        "down_revision": None,
+        "message": message,
+        "created_at": "2026-10-30T00:00:00+00:00",
+        "changes": {"assistant": {"before": None, "after": CFG}},
+    }
+
+
+def test_utf16_v0_revision_has_no_line_ending_checksums(project):
+    """A v0 file `json.loads` parses as UTF-16BE (no BOM) is not UTF-8, so no CR/LF variants are computed (Finding 1)."""
+    raw = json.dumps(_v0_item(), ensure_ascii=False, sort_keys=True).encode("utf-16-be")
+    target(project).write_bytes(raw)
+    [r] = load_revisions(project)
+    assert r.format_version == 0
+    assert r.line_ending_checksums == frozenset()
+
+
+def test_utf16_value_change_is_not_mistaken_for_line_endings(project):
+    """Reviewer's reproduction: a UTF-16BE v0 file whose message changed can hash-collide with the raw-byte LF
+    variant of a byte-level CR/LF swap, because U+0D0A encodes as the same two bytes as CR LF. `check` must still
+    report the plain tamper message, with no line-ending hint, because the file never decodes as UTF-8."""
+    applied_item = _v0_item("ਊ")
+    applied_raw = json.dumps(applied_item, ensure_ascii=False, sort_keys=True).encode("utf-16-be")
+    target(project).write_bytes(applied_raw)
+    upgrade(project, "dev")
+
+    disk_item = {**applied_item, "message": "ഊഊ"}
+    disk_raw = json.dumps(disk_item, ensure_ascii=False, sort_keys=True).encode("utf-16-be")
+    # Confirm the collision is genuine before relying on it: the LF-variant digest of the new bytes equals the
+    # applied digest, purely from byte-level CR/LF substitution, with no decoding involved.
+    lf_variant = disk_raw.replace(b"\r\n", b"\n")
+    assert sha(lf_variant) == sha(applied_raw)
+    assert disk_raw != applied_raw
+
+    target(project).write_bytes(disk_raw)
+    with pytest.raises(IntegrityError) as caught:
+        check(project, "dev")
+    assert str(caught.value) == TAMPER
 
 
 # --- Task 2: the diagnosis in the IntegrityError message ----------------------------------------

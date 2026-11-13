@@ -69,7 +69,7 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 | 2026-11-05 (after PR 6) | Windows 11, Python 3.11.9 | `python -m pytest -q` → `713 passed, 18 skipped, 33 warnings`; original unittest suite → `Ran 7 tests ... OK` |
 | 2026-11-13 (after PR 7) | Windows 11, Python 3.11.9 | `python -m pytest -q` → `741 passed, 18 skipped, 1 xfailed, 33 warnings`; original unittest suite → `Ran 7 tests ... OK` |
 | 2026-11-13 (after PR 8) | Windows 11, Python 3.11.9 | `python -m pytest -q` → `802 passed, 18 skipped, 33 warnings`; original unittest suite → `Ran 7 tests ... OK` |
-| 2026-11-13 (after PR 9) | Windows 11, Python 3.11.9 | `python -m pytest -q` → `850 passed, 18 skipped, 33 warnings`; original unittest suite → `Ran 7 tests ... OK` |
+| 2026-11-13 (after PR 9) | Windows 11, Python 3.11.9 | `python -m pytest -q` → `854 passed, 18 skipped, 33 warnings`; original unittest suite → `Ran 7 tests ... OK` |
 
 Implemented there: `init`, `revision`, `diff`, `history`, `current`, `plan`, `upgrade`, `downgrade`, `check`, `restamp`, `get`, `env add`, and `env list`; Git-trackable JSON revisions and declared environment manifest; per-environment **local** SQLite files; read-only inspection; legacy manifest adoption; snapshots; checksums at apply time (raw bytes for v0 revisions, canonical content for v1, ADR-026); explicit re-stamp of line-ending-only v0 ledger rows (`restamp`, ADR-027); state drift detection; one linear history; multi-prompt changes in one SQLite transaction.
 

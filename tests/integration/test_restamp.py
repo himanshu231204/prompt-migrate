@@ -137,6 +137,63 @@ def test_v1_mismatch_is_never_restamped(project):
     assert db_digest(project) == before
 
 
+def sha(data):
+    return hashlib.sha256(data).hexdigest()
+
+
+def _v0_item(message="m"):
+    return {
+        "revision": A,
+        "down_revision": None,
+        "message": message,
+        "created_at": "2026-10-30T00:00:00+00:00",
+        "changes": {"assistant": {"before": None, "after": {"messages": [{"role": "system", "content": "A"}]}}},
+    }
+
+
+def test_utf16_collision_is_never_restamped(project):
+    """Reviewer's reproduction (Finding 1): a UTF-16BE v0 file's value change can hash-collide with the raw-byte
+    LF variant of a byte-level CR/LF swap (U+0D0A encodes as the same two bytes as CR LF). `restamp` must still
+    refuse it and write nothing, because the file never decodes as UTF-8 and so has no line-ending variants."""
+    applied_item = _v0_item("ਊ")
+    applied_raw = json.dumps(applied_item, ensure_ascii=False, sort_keys=True).encode("utf-16-be")
+    target(project).write_bytes(applied_raw)
+    upgrade(project, "dev")
+
+    disk_item = {**applied_item, "message": "ഊഊ"}
+    disk_raw = json.dumps(disk_item, ensure_ascii=False, sort_keys=True).encode("utf-16-be")
+    lf_variant = disk_raw.replace(b"\r\n", b"\n")
+    assert sha(lf_variant) == sha(applied_raw)
+    assert disk_raw != applied_raw
+    target(project).write_bytes(disk_raw)
+
+    before = db_digest(project)
+    with pytest.raises(IntegrityError) as caught:
+        restamp(project, "dev")
+    assert str(caught.value) == f"Migration file was modified after apply: {A}"
+    assert db_digest(project) == before
+
+
+def test_restamp_success_changes_only_the_checksum(project):
+    """Finding 3: after a successful restamp, `applied_revisions` (seq, revision, applied_at) and `prompts`
+    (name, config) are identical to before; only the re-stamped `checksum` column changed."""
+    applied_then_swapped(project)
+    before_checksums = [checksum for _, checksum in ledger(project)]
+    with closing(sqlite3.connect(db_path(project))) as db:
+        before_applied = db.execute("SELECT seq, revision, applied_at FROM applied_revisions ORDER BY seq").fetchall()
+        before_prompts = db.execute("SELECT name, config FROM prompts ORDER BY name").fetchall()
+
+    assert restamp(project, "dev") == [A]
+
+    with closing(sqlite3.connect(db_path(project))) as db:
+        after_applied = db.execute("SELECT seq, revision, applied_at FROM applied_revisions ORDER BY seq").fetchall()
+        after_prompts = db.execute("SELECT name, config FROM prompts ORDER BY name").fetchall()
+    after_checksums = [checksum for _, checksum in ledger(project)]
+    assert after_applied == before_applied
+    assert after_prompts == before_prompts
+    assert after_checksums != before_checksums
+
+
 def test_v1_row_holding_a_line_ending_digest_is_never_restamped(project):
     """A v1 file whose ledger row holds a raw-byte digest of a line-ending variant (a pre-v1 tool) is not accepted."""
     created = revision(project, "initial")
