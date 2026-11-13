@@ -5,12 +5,13 @@ import sqlite3
 import sys
 import warnings
 from . import output
-from .commands import check, current, diff, downgrade, env, get, history, init, plan, revision, upgrade
+from .commands import check, current, diff, downgrade, env, get, history, init, plan, restamp, revision, upgrade
 from .errors import PromptMigrateWarning
 
 COMMANDS = {
     "init": init, "revision": revision, "history": history, "diff": diff, "current": current,
     "upgrade": upgrade, "downgrade": downgrade, "check": check, "get": get, "env": env, "plan": plan,
+    "restamp": restamp,
 }
 
 
@@ -39,6 +40,8 @@ def build_parser() -> argparse.ArgumentParser:
     chk = sub.add_parser("check", help="Verify no drift or edited-applied migrations")
     chk.add_argument("--env", default="dev")
     chk.add_argument("--require-head", action="store_true", help="Fail if migration(s) pending")
+    rst = sub.add_parser("restamp", help="Accept line-ending-only changes to applied v0 revisions")
+    rst.add_argument("--env", default="dev")
     get = sub.add_parser("get", help="Read a config from a local environment")
     get.add_argument("name")
     get.add_argument("--env", default="dev")

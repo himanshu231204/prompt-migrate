@@ -81,4 +81,4 @@ No SaaS dashboard, no visual prompt editor, no paid cloud control plane, no dire
 
 ## First next step
 
-Phase 1 cycle 2 is under way. Protocol v1 is shipped (ADR-026), so new revisions are immune to formatting-only changes; integrity guidance now reflects the separate v0 and v1 rules. Next: an explicit, opt-in `restamp` for v0 ledger rows whose mismatch is line endings only (v0 hash semantics unchanged). Use [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) and [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md), and keep to small tested PRs.
+Phase 1 cycle 2 is under way. Protocol v1 is shipped (ADR-026), so new revisions are immune to formatting-only changes; integrity guidance now reflects the separate v0 and v1 rules. `restamp`, an explicit, opt-in re-stamp of v0 ledger rows whose mismatch is line endings only, is shipped (ADR-027); v0 hash semantics are unchanged. Use [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) and [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md), and keep to small tested PRs.

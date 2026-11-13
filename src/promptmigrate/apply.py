@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Iterator
 from datetime import datetime, timezone
 from typing import Any
 
@@ -27,7 +28,8 @@ def _actual(db: sqlite3.Connection) -> dict[str, dict[str, Any]]:
     ).fetchall()}
 
 
-def _verify(db: sqlite3.Connection, revisions_: list[revisions.Revision]) -> int:
+def _ledger_rows(db: sqlite3.Connection, revisions_: list[revisions.Revision]) -> Iterator[tuple[revisions.Revision, str]]:
+    """Yield each ledger row as (source revision, stored checksum), in order, while its id matches source history."""
     try:
         applied = _applied(db)
     except sqlite3.Error as exc:
@@ -35,12 +37,18 @@ def _verify(db: sqlite3.Connection, revisions_: list[revisions.Revision]) -> int
     if len(applied) > len(revisions_):
         raise IntegrityError("Environment contains more applied revisions than source history")
     for index, (rid, checksum) in enumerate(applied):
-        source = revisions_[index]
-        if rid != source.revision:
+        if rid != revisions_[index].revision:
             raise IntegrityError(f"Applied revisions diverge from source history at index {index}")
+        yield revisions_[index], checksum
+
+
+def _verify(db: sqlite3.Connection, revisions_: list[revisions.Revision]) -> int:
+    count = 0
+    for source, checksum in _ledger_rows(db, revisions_):
         if checksum != source.checksum:
-            raise IntegrityError(f"Migration file was modified after apply: {rid}")
-    expected = revisions.replay_revisions(revisions_[:len(applied)])
+            raise IntegrityError(f"Migration file was modified after apply: {source.revision}")
+        count += 1
+    expected = revisions.replay_revisions(revisions_[:count])
     try:
         actual = _actual(db)
     except (sqlite3.Error, ValueError, TypeError, RecursionError) as exc:
@@ -49,7 +57,22 @@ def _verify(db: sqlite3.Connection, revisions_: list[revisions.Revision]) -> int
                    if not protocol.same(actual.get(name), expected.get(name)))
     if names:
         raise DriftError(f"Environment drift detected for prompts: {', '.join(names)}")
-    return len(applied)
+    return count
+
+
+def line_ending_only(db: sqlite3.Connection, revisions_: list[revisions.Revision]) -> list[revisions.Revision]:
+    """The applied v0 revisions whose ledger checksum matches their file only after a line-ending change (ADR-027).
+
+    Any other mismatch, a v1 row included, raises the IntegrityError `_verify` would raise for it.
+    """
+    stale = []
+    for source, checksum in _ledger_rows(db, revisions_):
+        if checksum == source.checksum:
+            continue
+        if source.format_version != 0 or checksum not in source.line_ending_checksums:
+            raise IntegrityError(f"Migration file was modified after apply: {source.revision}")
+        stale.append(source)
+    return stale
 
 
 def migrate(db: sqlite3.Connection, steps: list[revisions.Revision], *, backward: bool = False) -> None:

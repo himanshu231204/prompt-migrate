@@ -170,8 +170,11 @@ A revision file without `format_version` is v0. Its semantics are frozen (ADR-02
   that environment with "Migration file was modified after apply"
 
 Known risk: before protocol v1 the generator wrote the platform's line ending, so a v0 revision created and applied on
-Windows can fail `check` after Git normalises it to LF. New revisions are v1 and are not affected. An explicit
-recovery for such v0 ledger rows is planned (`restamp`, not implemented).
+Windows can fail `check` after Git normalises it to LF. New revisions are v1 and are not affected. For such v0 rows,
+`promptmigrate restamp --env <env>` is the explicit recovery (ADR-027). It re-stamps the ledger checksum of each
+applied v0 revision whose file differs from the applied bytes only in line endings (CRLF ↔ LF), and it fails closed,
+writing nothing, on any other mismatch. The v0 checksum itself does not change, and no other command accepts a
+line-ending change.
 
 ## v1 artifact
 

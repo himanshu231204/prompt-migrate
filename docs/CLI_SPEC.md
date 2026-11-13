@@ -21,6 +21,7 @@ Familiar to Alembic users, transparent in CI, safe by default. Commands distingu
 | `promptmigrate plan --env dev [--target head]` | Preview what `upgrade`/`downgrade` would do | Read-only: verifies the environment like `check`, writes nothing (no state file, no manifest adoption, no lock). Target is `head` (default), `-1`, `base` or a revision id; the direction is inferred from where the target lies. Lists each revision and its config changes (`create`/`update`/`delete`); prints `nothing to do` at the target. Same `Error:` text for unknown targets, drift and tampering as the commands it previews. |
 | `promptmigrate check --env dev` | Check applied integrity/state drift | Does not require env at source head; warns about secrets in history and stale allowlist entries |
 | `promptmigrate check --env dev --require-head` | Also require no pending revisions | Helpful for CI |
+| `promptmigrate restamp --env dev` | Accept line-ending-only changes to applied v0 revisions | Mutating and all or nothing: re-stamps the ledger checksum of each applied v0 revision whose file differs from the applied bytes only in line endings (CRLF ↔ LF), then verifies the environment like `check`. Any other mismatch, any v1 row, or drift fails with the normal error and writes nothing. No state database means nothing to do; nothing is created, and no manifest is adopted. Prints `Restamped <n> revision(s) in <env>: <ids>` (`(none)` when n = 0). Leaves no audit record until the cycle-3 events table (ADR-027) |
 | `promptmigrate get sql_agent --env dev` | Read applied local JSON | Only local stored config; secret-like values shown as <redacted:RULE> |
 | `promptmigrate env add qa` | Declare a local environment | Atomically updates `.promptmigrate/environments.json`; prints `Added environment: qa` |
 | `promptmigrate env list` | List declared environments | Prints sorted `<name>: state exists` or `<name>: no state`; never creates a database |
@@ -130,6 +131,7 @@ handled errors alike. Schema `promptmigrate.output/1`:
 | `upgrade` / `downgrade` | `direction` (`up`/`down`), `target`, `revisions[]` (ids applied or reverted, in order) |
 | `plan` | `direction` (`upgrade`/`downgrade`/`none`), `start`, `target` (ids, `null` at base), `steps[]` (`revision`, `changes[]` of `name`, `kind`: `create`/`update`/`delete`/`unchanged`), in the order they would run |
 | `check` | `consistent` (always `true`; inconsistency is an error), `applied`, `total` |
+| `restamp` | `restamped[]` (ids whose ledger checksum was re-stamped, in ledger order) |
 | `get` | `name`, `config` (redacted), `redacted[]` |
 | `env add` | `name` |
 | `env list` | `environments[]` (`name`, `has_state`) |

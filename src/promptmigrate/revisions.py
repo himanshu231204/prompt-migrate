@@ -27,10 +27,17 @@ class Revision:
     checksum: str
     path: Path
     format_version: int = 0
+    line_ending_checksums: frozenset[str] = frozenset()  # v0 only: raw-byte digests of the LF and CRLF re-saves
 
 
 def _hash(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def line_ending_variants(raw: bytes) -> set[str]:
+    """Raw-byte digests of `raw` re-saved with LF and with CRLF line endings (ADR-027). The v0 checksum is unchanged."""
+    lf = raw.replace(b"\r\n", b"\n")
+    return {_hash(lf), _hash(lf.replace(b"\n", b"\r\n"))}
 
 
 def _v1_checksum(item: dict[str, Any]) -> str:
@@ -86,15 +93,17 @@ def load_revisions(project_dir: Path) -> list[Revision]:
             if change["after"] is not None:
                 found.extend(protocol.config_violations(name, change["after"]))
         violations[rid] = found
+        variants: frozenset[str] = frozenset()
         if version == 0:
             checksum = _hash(raw)
+            variants = frozenset(line_ending_variants(raw))
         else:
             try:
                 checksum = _v1_checksum(item)
             except UnicodeEncodeError as exc:
                 raise SchemaError(f"Invalid string in {path.name}: unpaired surrogate") from exc
         unsorted[rid] = Revision(
-            rid, parent, item["message"], item["created_at"], changes, checksum, path, version
+            rid, parent, item["message"], item["created_at"], changes, checksum, path, version, variants
         )
 
     if not unsorted:
