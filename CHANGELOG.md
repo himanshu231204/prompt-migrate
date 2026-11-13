@@ -4,6 +4,7 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
 
 ## Unreleased
 
+- Added an SVG banner to the README showing PromptMigrate's ordered revision flow and verified local environment state.
 - Corrected README and handoff documentation to include the shipped `plan` command and native Windows/macOS CI coverage; refreshed the documented test baseline and suite location. Brought `PRD.md`, `ROADMAP.md` and `LOW_LEVEL_DESIGN.md` up to date with the shipped `plan`, exit codes, JSON output, typed errors and strict loader. Moved all agent rules and the architecture overview from `CLAUDE.md` into `AGENTS.md`.
 - Compacted `AGENTS.md` without dropping rules, and added a "Before every commit" rule: each commit updates `CHANGELOG.md` and `docs/ROADMAP.md`.
 

@@ -1,6 +1,6 @@
 # ROADMAP — From local prototype to reliable open-source project
 
-> Milestones are **plans**, not shipping promises. Status checked against the code on 2026-11-05.
+> Milestones are **plans**, not shipping promises. Status checked against the code on 2026-11-13.
 
 ## Phase 0 — Existing proof of concept
 

@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/readme-banner.svg" alt="PromptMigrate — ordered, reversible migrations for AI configuration" width="100%" />
+</p>
+
 # PromptMigrate (working name)
 
 **An Alembic-inspired, migration-first CLI for production AI prompts and agent configuration.**
