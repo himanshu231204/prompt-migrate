@@ -17,12 +17,12 @@ Modules by layer (`docs/LOW_LEVEL_DESIGN.md` §1): `protocol/` (limits, strict J
 
 State under `.promptmigrate/`: `drafts/<name>.json` (desired config); `versions/<12hex>_<slug>.json` (revisions, `changes: {name: {before, after}}` as full snapshots, `null` = absent); `environments.json` (declared envs, Git tracked; legacy projects adopted on first mutation); `states/<env>.sqlite3` (gitignored; `applied_revisions` ledger + `prompts`; missing = base, incomplete = error). Runtime state is not implemented.
 
-Flow: `load_revisions()` enforces one linear chain and replays it from `{}`. `revision()` diffs drafts against the replayed source head, never an env DB. `upgrade`/`downgrade` run `BEGIN IMMEDIATE` → `_verify()` (ledger is an exact (id, checksum) prefix of history and `prompts` equals `replay(prefix)`, else drift) → `_apply_changes()` re-checks preconditions → rows and ledger commit together. Checksums: v0 files (no `format_version`) hash raw bytes; v1 files hash `"v1:" + sha256(canonical(item))` (ADR-026). Downgrade deletes ledger rows; there is no audit log yet.
+Flow: `load_revisions()` enforces one linear chain and replays it from `{}`. `revision()` diffs drafts against the replayed source head, never an env DB. `upgrade`/`downgrade` run `BEGIN IMMEDIATE` → `_verify()` (ledger is an exact (id, checksum) prefix of history and `prompts` equals `replay(prefix)`, else drift) → `_apply_changes()` re-checks preconditions → rows and ledger commit together. Checksums: v0 files (no `format_version`) hash raw bytes; v1 files hash `"v1:" + sha256(canonical(item))` (ADR-026). `restamp` re-stamps only v0 ledger rows whose file changed in line endings alone (ADR-027). Downgrade deletes ledger rows; there is no audit log yet.
 
 ## Verified baseline (2026-11-13)
 
-- Shipped: `init`, `revision`, `history`, `diff`, `current`, `upgrade`, `downgrade`, `plan`, `check`, `get`, `env add`, `env list`; `--output json`; exit codes 0–5.
-- Windows 11 / Python 3.11.9: `python -m pytest -q` → `802 passed, 18 skipped, 33 warnings` (host symlink, case-insensitivity and POSIX-permission skips); unittest → `Ran 7 tests ... OK`. CI: Linux Docker plus native Windows and macOS, Python 3.10/3.12/3.13.
+- Shipped: `init`, `revision`, `history`, `diff`, `current`, `upgrade`, `downgrade`, `plan`, `check`, `restamp`, `get`, `env add`, `env list`; `--output json`; exit codes 0–5.
+- Windows 11 / Python 3.11.9: `python -m pytest -q` → `850 passed, 18 skipped, 33 warnings` (host symlink, case-insensitivity and POSIX-permission skips); unittest → `Ran 7 tests ... OK`. CI: Linux Docker plus native Windows and macOS, Python 3.10/3.12/3.13.
 - Not shipped (never claim otherwise): `eval`, `export`, `promote`, `reconcile`, cloud adapters, SDK, Postgres, RBAC, signed revisions, real production activation.
 
 ## Process
