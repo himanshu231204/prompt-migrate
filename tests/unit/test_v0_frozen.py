@@ -9,8 +9,9 @@ import json
 
 import pytest
 
-from pmtest import FIXTURES, install_fixture, pm_dir, pm_warnings
-from promptmigrate.core import SchemaError, check, downgrade, get_config, load_revisions, upgrade
+from pmtest import FIXTURES, install_fixture, pm_dir, pm_warnings, swap_line_endings
+from promptmigrate.core import SchemaError, check, downgrade, get_config, load_revisions, revision, upgrade
+from promptmigrate.errors import IntegrityError
 
 PINS = json.loads((FIXTURES / "v0_checksums.json").read_text(encoding="utf-8"))
 CASES = [("v0_frozen", "basic"), ("v0_frozen", "extra_key"), ("v0_frozen", "bom"), ("crlf", "lf"), ("crlf", "crlf")]
@@ -84,3 +85,32 @@ def test_each_required_key_is_required(project, key):
     (pm_dir(project) / "versions" / "aaaaaaaaaaaa_create.json").write_text(json.dumps(item), encoding="utf-8")
     with pytest.raises(SchemaError, match="Invalid migration format: aaaaaaaaaaaa_create.json"):
         load_revisions(project)
+
+
+def test_crlf_and_lf_fixtures_differ_only_in_line_endings():
+    lf = (FIXTURES / "crlf/lf/aaaaaaaaaaaa_create.json").read_bytes()
+    crlf = (FIXTURES / "crlf/crlf/aaaaaaaaaaaa_create.json").read_bytes()
+    assert b"\r" not in lf
+    assert lf.replace(b"\n", b"\r\n") == crlf
+    assert json.loads(lf) == json.loads(crlf)
+    assert hashlib.sha256(lf).hexdigest() != hashlib.sha256(crlf).hexdigest()
+
+
+@pytest.mark.parametrize("applied,replacement", [("crlf", "lf"), ("lf", "crlf")])
+def test_v0_line_ending_change_after_apply_is_tamper(project, applied, replacement):
+    """The CRLF false-tamper risk (R4): v0 has no tolerance for line endings, and PR 9 keeps it that way."""
+    install_fixture(project, applied, "crlf")
+    upgrade(project, "dev")
+    target = pm_dir(project) / "versions" / "aaaaaaaaaaaa_create.json"
+    target.write_bytes((FIXTURES / "crlf" / replacement / "aaaaaaaaaaaa_create.json").read_bytes())
+    with pytest.raises(IntegrityError, match="modified after apply: aaaaaaaaaaaa"):
+        check(project, "dev")
+
+
+@pytest.mark.xfail(strict=True, raises=IntegrityError,
+                   reason="fixed by PR 8: new revisions use the protocol v1 canonical hash")
+def test_generated_revision_survives_line_ending_change(project):
+    created = revision(project, "initial")
+    upgrade(project, "dev")
+    swap_line_endings(created.path)
+    assert check(project, "dev") == (1, 1)

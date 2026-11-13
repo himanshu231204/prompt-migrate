@@ -60,6 +60,15 @@ def tree_snapshot(root) -> dict[str, bytes]:
     return {p.relative_to(root).as_posix(): p.read_bytes() for p in sorted(root.rglob("*")) if p.is_file()}
 
 
+def swap_line_endings(path) -> bytes:
+    """Rewrite `path` with its other line ending (CRLF -> LF, or LF -> CRLF) and return the new bytes."""
+    path = Path(path)
+    data = path.read_bytes()
+    new = data.replace(b"\r\n", b"\n") if b"\r\n" in data else data.replace(b"\n", b"\r\n")
+    path.write_bytes(new)
+    return new
+
+
 def fake_key(char="0") -> str:
     """An OpenAI-shaped fake key, built at runtime so no token-shaped literal is committed."""
     return "sk-" + char * 24
