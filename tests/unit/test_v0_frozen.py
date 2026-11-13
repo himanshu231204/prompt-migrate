@@ -98,7 +98,7 @@ def test_crlf_and_lf_fixtures_differ_only_in_line_endings():
 
 @pytest.mark.parametrize("applied,replacement", [("crlf", "lf"), ("lf", "crlf")])
 def test_v0_line_ending_change_after_apply_is_tamper(project, applied, replacement):
-    """The CRLF false-tamper risk (R4): v0 has no tolerance for line endings, and PR 9 keeps it that way."""
+    """The CRLF false-tamper risk (ADR-025): v0 has no tolerance for line endings, and PR 9 keeps it that way."""
     install_fixture(project, applied, "crlf")
     upgrade(project, "dev")
     target = pm_dir(project) / "versions" / "aaaaaaaaaaaa_create.json"

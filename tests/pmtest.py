@@ -65,6 +65,7 @@ def swap_line_endings(path) -> bytes:
     path = Path(path)
     data = path.read_bytes()
     new = data.replace(b"\r\n", b"\n") if b"\r\n" in data else data.replace(b"\n", b"\r\n")
+    assert new != data, f"{path} has no line endings to swap"
     path.write_bytes(new)
     return new
 

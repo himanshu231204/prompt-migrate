@@ -165,9 +165,10 @@ A revision file without `format_version` is v0. Its semantics are frozen (ADR-02
 - checksum: SHA-256 of the raw file bytes. Any byte change after apply, including line endings or whitespace, blocks
   that environment with "Migration file was modified after apply"
 
-Known risk: the generator writes the platform's line ending, while `.gitattributes` stores revisions as LF. A revision
-created and applied on Windows can therefore fail `check` after a checkout. Protocol v1 is planned to remove this for
-new revisions; until then, apply revisions only after they are committed and checked out again.
+Known risk: the generator writes the platform's line ending, but if Git normalises revision files to LF (for example
+`* text=auto eol=lf`, or a checkout on another OS), a revision created and applied on Windows can therefore fail
+`check` after a checkout. Protocol v1 is planned to remove this for new revisions; until then, apply revisions only
+after they are committed and checked out again.
 
 ## Integrity checks
 

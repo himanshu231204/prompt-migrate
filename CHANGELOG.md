@@ -13,6 +13,7 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
   SHA-256 of the raw bytes. Added byte-exact v0 and CRLF fixtures with pinned checksums and characterization tests.
   The CRLF false-tamper risk is now documented in `MIGRATION_PROTOCOL.md` and pinned as a strict xfail.
   No code, CLI, file-format or checksum change.
+- Recorded the post-PR 7 test baseline in TESTING_STRATEGY.md and HANDOFF.md, and clarified the v0 line-ending risk wording.
 
 ### Phase 1 cycle 1 — exit codes and `--output json` (PR 6)
 
