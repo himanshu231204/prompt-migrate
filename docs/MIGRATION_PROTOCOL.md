@@ -33,6 +33,7 @@ File: `.promptmigrate/versions/b2c3d4e5f6a7_improve_sql_agent.json`
 
 ```json
 {
+  "format_version": 1,
   "revision": "b2c3d4e5f6a7",
   "down_revision": "a1b2c3d4e5f6",
   "message": "Improve SQL agent safety",
@@ -49,6 +50,9 @@ File: `.promptmigrate/versions/b2c3d4e5f6a7_improve_sql_agent.json`
   }
 }
 ```
+
+`revision` writes new files as v1 (see "v1 artifact"): keys sorted, two-space indentation, UTF-8, LF line endings on
+every OS. Files without `format_version` are v0.
 
 **Snapshot rules:**
 
@@ -165,10 +169,9 @@ A revision file without `format_version` is v0. Its semantics are frozen (ADR-02
 - checksum: SHA-256 of the raw file bytes. Any byte change after apply, including line endings or whitespace, blocks
   that environment with "Migration file was modified after apply"
 
-Known risk: the generator writes the platform's line ending, but if Git normalises revision files to LF (for example
-`* text=auto eol=lf`, or a checkout on another OS), a revision created and applied on Windows can therefore fail
-`check` after a checkout. Protocol v1 is planned to remove this for new revisions; until then, apply revisions only
-after they are committed and checked out again.
+Known risk: before protocol v1 the generator wrote the platform's line ending, so a v0 revision created and applied on
+Windows can fail `check` after Git normalises it to LF. New revisions are v1 and are not affected. An explicit
+recovery for such v0 ledger rows is planned (`restamp`, not implemented).
 
 ## v1 artifact
 
@@ -183,6 +186,8 @@ A revision file whose top-level `format_version` is the JSON integer `1` is v1 (
   ASCII escaping; the same form used for state equality). Line endings, indentation, key order, whitespace, JSON
   string escapes and a BOM do not change it. Any change to a parsed value does, and so does removing
   `format_version`, because the file then becomes v0
+- generator: `revision` writes v1, UTF-8 with LF line endings on every OS; the 16 MiB size check counts those exact
+  bytes
 
 ## Integrity checks
 

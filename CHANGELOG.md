@@ -17,6 +17,10 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
 - Added v1 integrity tests: re-saved v1 revisions still verify, value edits fail closed, mixed v0 → v1 histories
   upgrade, check and downgrade, an I16 property test over random re-serializations, and plan==apply over mixed
   histories.
+- **Contract:** `revision` now writes protocol v1 files (`format_version: 1`) with LF line endings on every OS,
+  which fixes the CRLF false-tamper risk for new revisions (the PR 7 xfail now passes). PromptMigrate versions without
+  v1 support still load these files but treat them as v0 and store raw-byte checksums, so use one version per
+  environment: mixing them fails closed with "Migration file was modified after apply".
 
 ### Phase 1 cycle 2 — freeze v0 artifact semantics (PR 7)
 

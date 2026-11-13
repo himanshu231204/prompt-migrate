@@ -107,9 +107,8 @@ def test_v0_line_ending_change_after_apply_is_tamper(project, applied, replaceme
         check(project, "dev")
 
 
-@pytest.mark.xfail(strict=True, raises=IntegrityError,
-                   reason="fixed by PR 8: new revisions use the protocol v1 canonical hash")
 def test_generated_revision_survives_line_ending_change(project):
+    """Fixed by PR 8: the generator writes protocol v1, whose canonical checksum ignores line endings (ADR-026)."""
     created = revision(project, "initial")
     upgrade(project, "dev")
     swap_line_endings(created.path)

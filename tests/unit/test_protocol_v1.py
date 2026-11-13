@@ -6,12 +6,14 @@ count and every value does. A file without `format_version` is v0 and keeps its 
 """
 import hashlib
 import json
+import re
+from datetime import datetime
 
 import pytest
 
 from pmtest import pm_dir, pm_warnings, write_revision
 from promptmigrate import protocol, revisions
-from promptmigrate.core import SchemaError, load_revisions
+from promptmigrate.core import SchemaError, check, load_revisions, revision, upgrade
 
 A, B = "a" * 12, "b" * 12
 CREATED = "2026-10-30T00:00:00+00:00"
@@ -142,3 +144,39 @@ def test_each_v1_key_is_required(project, key):
     put(project, json.dumps(item).encode("utf-8"))
     with pytest.raises(SchemaError, match=r"^Invalid migration format: aaaaaaaaaaaa\.json$"):
         load_revisions(project)
+
+
+# --- generator: new revisions are v1 with LF line endings -----------------------------------------
+
+def test_generated_revision_is_v1_with_lf_line_endings(project):
+    created = revision(project, "initial")
+    raw = created.path.read_bytes()
+    item = json.loads(raw)
+    assert b"\r" not in raw and raw.endswith(b"}\n")
+    assert set(item) == V1_KEYS and type(item["format_version"]) is int and item["format_version"] == 1
+    assert created.format_version == 1
+    assert created.checksum == revisions._v1_checksum(item)
+
+
+def test_generated_revision_survives_whitespace_edit(project):
+    created = revision(project, "initial")
+    upgrade(project, "dev")
+    created.path.write_bytes(created.path.read_bytes().replace(b"\n", b"\n  ") + b"\n")
+    assert check(project, "dev", require_head=True) == (1, 1)
+
+
+class _FixedClock(datetime):
+    @classmethod
+    def now(cls, tz=None):
+        return datetime(2026, 11, 13, 12, 0, 0, 123456, tzinfo=tz)
+
+
+def test_size_check_counts_the_lf_bytes_written(project, monkeypatch):
+    monkeypatch.setattr("promptmigrate.commands.revision.datetime", _FixedClock)
+    limit = protocol.limits.MAX_REVISION_BYTES
+    monkeypatch.setattr(protocol.limits, "MAX_REVISION_BYTES", 1)
+    with pytest.raises(SchemaError, match=r"^New revision would be (\d+) bytes; the limit is 1$") as refused:
+        revision(project, "initial")
+    reported = int(re.search(r"would be (\d+) bytes", str(refused.value)).group(1))
+    monkeypatch.setattr(protocol.limits, "MAX_REVISION_BYTES", limit)
+    assert revision(project, "initial").path.stat().st_size == reported

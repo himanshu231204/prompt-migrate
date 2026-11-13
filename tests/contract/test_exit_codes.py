@@ -107,7 +107,7 @@ def test_malformed_revision_file_is_3(project, capsys):
 def test_edited_applied_revision_is_4(project, capsys):
     applied_project(project, capsys)
     path = next((pm_dir(project) / "versions").glob("*.json"))
-    path.write_bytes(path.read_bytes() + b" ")
+    path.write_text(json.dumps({**json.loads(path.read_bytes()), "message": "edited after apply"}), encoding="utf-8")
     assert run(capsys, project, "check", "--env", "dev")[0] == 4
 
 

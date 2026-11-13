@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import os
 import re
 import uuid
 import warnings
@@ -35,6 +34,7 @@ def revision(project_dir: Path, message: str) -> revisions.Revision:
     if findings:
         raise SecretDetectedError(findings)
     item = {
+        "format_version": 1,
         "revision": rid,
         "down_revision": parent,
         "message": message.strip(),
@@ -42,8 +42,8 @@ def revision(project_dir: Path, message: str) -> revisions.Revision:
         "changes": changes,
     }
     text = project.pretty(item)
-    # write_text translates "\n" to os.linesep, so this is the exact size of the file it writes.
-    size = len(text.replace("\n", os.linesep).encode("utf-8"))
+    # The file is written with LF line endings on every OS (ADR-026), so this is its exact size.
+    size = len(text.encode("utf-8"))
     if size > protocol.limits.MAX_REVISION_BYTES:
         raise SchemaError(f"New revision would be {size} bytes; the limit is {protocol.limits.MAX_REVISION_BYTES}")
     for name, change in changes.items():
@@ -59,7 +59,8 @@ def revision(project_dir: Path, message: str) -> revisions.Revision:
                               "the credential must be rotated", SecretInHistoryWarning, stacklevel=2)
     root = project.require_init(project_dir)
     path = root / "versions" / f"{rid}_{re.sub(r'[^a-z0-9]+', '_', message.lower()).strip('_')[:50] or 'revision'}.json"
-    path.write_text(text, encoding="utf-8")
+    with open(path, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(text)
     return revisions.load_revisions(project_dir)[-1]
 
 
