@@ -9,7 +9,7 @@ Familiar to Alembic users, transparent in CI, safe by default. Commands distingu
 | Command | Purpose | Important behavior |
 |---|---|---|
 | `promptmigrate init` | Scaffold project | Creates `.promptmigrate/`, starter `assistant.json`, and declared `dev`/`staging` environments |
-| `promptmigrate revision -m "message"` | Generate revision from draft delta | Rejects no-op; parent = source head; refuses drafts that break validation or limits, and secret-like values in new content, before writing |
+| `promptmigrate revision -m "message"` | Generate revision from draft delta | Rejects no-op; parent = source head; refuses drafts that break validation or limits, and secret-like values in new content, before writing; writes a protocol v1 file (`format_version: 1`, LF line endings on every OS; see `MIGRATION_PROTOCOL.md`) |
 | `promptmigrate diff` | Compare drafts with source migration head | JSON diff to stdout; not env diff; secret-like values shown as <redacted:RULE> |
 | `promptmigrate history` | Print ordered source revisions | Shows ID, parent, message; secret-like messages shown as <redacted:RULE> |
 | `promptmigrate current --env dev` | Show env applied head | Verifies local state first |
@@ -80,6 +80,11 @@ Handled errors are typed (`errors.py`); `output.py` maps them to the exit status
 `6` (evaluation gate) and `7` (provider error) are reserved and not emitted: no command can produce them yet. Code `1`
 keeps its pre-existing meaning, so scripts that only test for non-zero keep working. An unhandled exception still
 propagates as a Python traceback.
+
+Revision files with an unsupported `format_version` (`Unsupported format_version in <file>`), in a v1 file, an
+unknown top-level key (`Unknown top-level key in <file>: <keys>`), or a string with an unpaired surrogate escape
+(`Invalid string in <file>: unpaired surrogate`) are `SchemaError`s and exit 3 (see `MIGRATION_PROTOCOL.md`,
+"v1 artifact").
 
 **Warnings:** each distinct warning is printed once per invocation to stderr as `Warning: <message>`, before any
 `Error: …` line. Warnings never change the exit code. Warnings come from existing revision files that break a tier-B

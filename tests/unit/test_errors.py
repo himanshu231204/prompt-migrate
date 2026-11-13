@@ -1,4 +1,5 @@
 """PR 3: every handled error raises a specific MigrationError subclass; messages are unchanged."""
+import json
 import re
 import sqlite3
 from contextlib import closing
@@ -157,7 +158,8 @@ def applied(project):
 
 
 def test_edited_applied_revision_is_integrity_error(project, applied):
-    applied.path.write_bytes(applied.path.read_bytes() + b"\n")
+    item = json.loads(applied.path.read_bytes())
+    applied.path.write_text(json.dumps({**item, "message": "edited after apply"}), encoding="utf-8")
     with pytest.raises(IntegrityError, match=f"Migration file was modified after apply: {applied.revision}"):
         check(project, "dev")
 

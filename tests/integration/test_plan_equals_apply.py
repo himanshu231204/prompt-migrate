@@ -53,7 +53,9 @@ def test_plan_equals_apply(data, history):
         ids = []
         for index, changes in enumerate(history):
             rid = f"{index + 1:012x}"
-            write_revision(project, rid, ids[-1] if ids else None, changes)
+            # Each revision is v0 or v1 (ADR-026), so mixed histories are covered too.
+            write_revision(project, rid, ids[-1] if ids else None, changes,
+                           format_version=data.draw(st.sampled_from([None, 1])))
             ids.append(rid)
         applied = data.draw(st.integers(0, len(ids)))
         if applied:

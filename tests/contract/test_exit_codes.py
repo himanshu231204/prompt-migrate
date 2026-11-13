@@ -107,7 +107,7 @@ def test_malformed_revision_file_is_3(project, capsys):
 def test_edited_applied_revision_is_4(project, capsys):
     applied_project(project, capsys)
     path = next((pm_dir(project) / "versions").glob("*.json"))
-    path.write_bytes(path.read_bytes() + b" ")
+    path.write_text(json.dumps({**json.loads(path.read_bytes()), "message": "edited after apply"}), encoding="utf-8")
     assert run(capsys, project, "check", "--env", "dev")[0] == 4
 
 
@@ -165,3 +165,36 @@ def test_stdout_write_failure_is_a_storage_error(project, capsys, monkeypatch, f
     code = cli.main(["--project", str(project), "--output", fmt, "history"])
     assert code == 5
     assert capsys.readouterr().err.startswith("Error: ")
+
+
+@pytest.mark.parametrize("value", [0, 2, True, 1.0, "1"])
+def test_unsupported_format_version_is_3(project, capsys, value):
+    write_revision(project, "a" * 12, None, {"assistant": create()}, format_version=value)
+    code, _, err = run(capsys, project, "history")
+    assert (code, err) == (3, "Error: Unsupported format_version in aaaaaaaaaaaa.json\n")
+
+
+def test_unknown_v1_top_level_key_is_3(project, capsys):
+    path = write_revision(project, "a" * 12, None, {"assistant": create()}, format_version=1)
+    path.write_text(json.dumps({**json.loads(path.read_bytes()), "author": "x"}), encoding="utf-8")
+    code, _, err = run(capsys, project, "check", "--env", "dev")
+    assert (code, err) == (3, "Error: Unknown top-level key in aaaaaaaaaaaa.json: author\n")
+
+
+def test_unpaired_surrogate_in_v1_is_3(project, capsys):
+    item = {
+        "format_version": 1,
+        "revision": "a" * 12,
+        "down_revision": None,
+        "message": "x\udc80",
+        "created_at": "2026-10-30T00:00:00+00:00",
+        "changes": {"assistant": create()},
+    }
+    path = pm_dir(project) / "versions" / "aaaaaaaaaaaa.json"
+    path.write_bytes(json.dumps(item).encode("ascii"))
+    code, _, err = run(capsys, project, "history")
+    assert (code, err) == (3, "Error: Invalid string in aaaaaaaaaaaa.json: unpaired surrogate\n")
+
+    code, out, err = run(capsys, project, "--output", "json", "history")
+    assert code == 3
+    json.loads(out)

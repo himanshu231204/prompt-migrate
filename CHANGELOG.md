@@ -4,9 +4,27 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
 
 ## Unreleased
 
+- Clarified that applied v0 revisions are checked by raw bytes, while v1 revisions allow formatting-only changes and are checked by canonical parsed content; aligned the integrity test guidance.
 - Added an SVG banner to the README showing PromptMigrate's ordered revision flow and verified local environment state.
 - Corrected README and handoff documentation to include the shipped `plan` command and native Windows/macOS CI coverage; refreshed the documented test baseline and suite location. Brought `PRD.md`, `ROADMAP.md` and `LOW_LEVEL_DESIGN.md` up to date with the shipped `plan`, exit codes, JSON output, typed errors and strict loader. Moved all agent rules and the architecture overview from `CLAUDE.md` into `AGENTS.md`.
 - Compacted `AGENTS.md` without dropping rules, and added a "Before every commit" rule: each commit updates `CHANGELOG.md` and `docs/ROADMAP.md`.
+
+### Phase 1 cycle 2 — protocol v1 and canonical revision hashes (PR 8)
+
+- **Contract:** Revision files with `"format_version": 1` are read as protocol v1 (ADR-026): exactly six top-level keys, and a
+  `v1:`-tagged SHA-256 of the canonical parsed object as checksum, so line endings, whitespace and key order no
+  longer count for them. Any other `format_version` value, or an unknown key in a v1 file, is a `SchemaError`
+  (exit 3). Files without `format_version` stay v0, unchanged. A hand-written revision that already carried a
+  `format_version` key used to load as v0 and now follows these rules.
+- Added v1 integrity tests: re-saved v1 revisions still verify, value edits fail closed, mixed v0 → v1 histories
+  upgrade, check and downgrade, an I16 property test over random re-serializations, and plan==apply over mixed
+  histories.
+- **Contract:** `revision` now writes protocol v1 files (`format_version: 1`) with LF line endings on every OS,
+  which fixes the CRLF false-tamper risk for new revisions (the PR 7 xfail now passes). PromptMigrate versions without
+  v1 support still load these files but treat them as v0 and store raw-byte checksums, so use one version per
+  environment: mixing them fails closed with "Migration file was modified after apply".
+- Recorded the post-PR 8 test baseline (802 passed, 18 skipped) and marked open questions 1 and 4 answered.
+- Unpaired surrogate escapes in a v1 revision are now a SchemaError (exit 3) instead of a traceback; refreshed the README example and v1 design notes.
 
 ### Phase 1 cycle 2 — freeze v0 artifact semantics (PR 7)
 

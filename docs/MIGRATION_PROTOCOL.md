@@ -2,7 +2,7 @@
 
 ## Purpose and status
 
-This is the proposed **v0.x file protocol**. It documents today's starter file shape and explicitly calls out possible future protocol upgrades. Do **not** silently introduce a breaking format or reinterpret applied checksums.
+This documents the revision file protocol: the frozen v0 format (ADR-025) and protocol v1 (ADR-026). Do **not** silently introduce a breaking format or reinterpret applied checksums: any change to meaning or hashing needs a new `format_version` with its own reader.
 
 ## Configuration draft
 
@@ -33,6 +33,7 @@ File: `.promptmigrate/versions/b2c3d4e5f6a7_improve_sql_agent.json`
 
 ```json
 {
+  "format_version": 1,
   "revision": "b2c3d4e5f6a7",
   "down_revision": "a1b2c3d4e5f6",
   "message": "Improve SQL agent safety",
@@ -49,6 +50,9 @@ File: `.promptmigrate/versions/b2c3d4e5f6a7_improve_sql_agent.json`
   }
 }
 ```
+
+`revision` writes new files as v1 (see "v1 artifact"): keys sorted, two-space indentation, UTF-8, LF line endings on
+every OS. Files without `format_version` are v0.
 
 **Snapshot rules:**
 
@@ -130,7 +134,7 @@ object counts as 1.
 
 | Tier | Rules | Drafts and new revisions | Existing revision files |
 |---|---|---|---|
-| A, ambiguity | invalid JSON, duplicate keys, non-finite numbers, nesting too deep to parse, symlink leaving `.promptmigrate/`, structural rules (keys, ids, `messages`, graph, preconditions) | error | error |
+| A, ambiguity | invalid JSON, duplicate keys, non-finite numbers, nesting too deep to parse, symlink leaving `.promptmigrate/`, structural rules (keys, `format_version`, v1 unknown keys, ids, `messages`, graph, preconditions) | error | error |
 | B, hygiene and limits | the rule ids below | error | `LegacyRevisionWarning`; loading continues |
 
 | Tier-B rule id | Meaning |
@@ -165,17 +169,45 @@ A revision file without `format_version` is v0. Its semantics are frozen (ADR-02
 - checksum: SHA-256 of the raw file bytes. Any byte change after apply, including line endings or whitespace, blocks
   that environment with "Migration file was modified after apply"
 
-Known risk: the generator writes the platform's line ending, but if Git normalises revision files to LF (for example
-`* text=auto eol=lf`, or a checkout on another OS), a revision created and applied on Windows can therefore fail
-`check` after a checkout. Protocol v1 is planned to remove this for new revisions; until then, apply revisions only
-after they are committed and checked out again.
+Known risk: before protocol v1 the generator wrote the platform's line ending, so a v0 revision created and applied on
+Windows can fail `check` after Git normalises it to LF. New revisions are v1 and are not affected. An explicit
+recovery for such v0 ledger rows is planned (`restamp`, not implemented).
+
+## v1 artifact
+
+A revision file whose top-level `format_version` is the JSON integer `1` is v1 (ADR-026):
+
+- exactly the top-level keys `format_version`, `revision`, `down_revision`, `message`, `created_at`, `changes`. Any
+  other key is a tier-A error: `Unknown top-level key in <file>: <keys>`
+- `format_version` must be the integer `1`. `0`, `2`, `true`, `1.0`, `1e0`, `"1"`, `null` or any other value is a
+  tier-A error: `Unsupported format_version in <file>`. A file without the key is v0
+- every other rule is the v0 rule: ids, metadata types, the `changes` shape, tier-B warnings, BOM accepted
+- checksum: `"v1:"` + SHA-256 of `protocol.canonical` of the whole parsed file (sorted keys, `,`/`:` separators, no
+  ASCII escaping; the same form used for state equality). Line endings, indentation, key order, whitespace, JSON
+  string escapes and a BOM do not change it. Any change to a parsed value does, and so does removing
+  `format_version`, because the file then becomes v0
+- generator: `revision` writes v1, UTF-8 with LF line endings on every OS; the 16 MiB size check counts those exact
+  bytes
+- a string containing an unpaired UTF-16 surrogate escape (for example `"\udc80"`) cannot be canonicalised and is a
+  tier-A error: `Invalid string in <file>: unpaired surrogate`
 
 ## Integrity checks
 
-The current implementation stores `SHA-256(raw revision file bytes)` in the `applied_revisions` ledger. A later change to the file — including whitespace-only modification — will be rejected for environments where that revision was applied.
+`upgrade` and `downgrade` store each applied revision's checksum in the environment's `applied_revisions` ledger.
+Every command that verifies an environment compares the ledger, row by row, with the checksums of the current source
+files. A mismatch is `IntegrityError` "Migration file was modified after apply: <id>" (exit 4).
 
+| Format | Ledger value | A mismatch after apply means |
+|---|---|---|
+| v0 | 64 hex digits: SHA-256 of the raw file bytes | any byte changed, whitespace and line endings included |
+| v1 | `v1:` + 64 hex digits: SHA-256 of the canonical parsed object | some parsed value changed |
+
+- The two forms can never be equal, so changing a file's format after apply is always a mismatch.
+- The ledger schema is the same for both; one history may mix v0 and v1 revisions.
+- A PromptMigrate version without v1 support loads a v1 file as v0 (it ignores the unknown key) and stores a raw-byte
+  checksum. Use one PromptMigrate version per environment: mixing them fails closed with the error above.
 - This is **tamper detection relative to that environment ledger**, not cryptographic proof of author identity.
-- A future `format_version` field, canonical artifact hashing, manifest signatures, and transparency/audit trail need an explicit migration/compatibility design.
+  Signatures and a transparency/audit trail need their own design.
 - Preexisting revisions must remain readable after schema evolution.
 
 ## Environment names
@@ -204,6 +236,8 @@ For MVP: at most one root and one child per revision. No merge branches, disconn
 - Never serialize secrets; use references like `secret://provider/credential` where needed. `revision` refuses secret-like values in new content (heuristic; see `SECURITY.md`).
 - Client code and tool schema may need compatibility constraints recorded alongside config.
 
-## Future `format_version` proposal (not implemented)
+## Protocol versions
 
-Potential fields: `format_version: 1`, `artifact_sha256`, `dependencies`, `metadata`, and `compatibility`. Define canonical serialization bytes, validation, and migration rules before shipping a public stable protocol. Do not add them experimentally without migration tests.
+Shipped: v0 (ADR-025) and v1 (ADR-026). v1 adds only `format_version`. `artifact_sha256`, `dependencies`,
+`metadata`, `compatibility` and signatures are not implemented; each needs a new format version with its own reader,
+validation and migration tests.

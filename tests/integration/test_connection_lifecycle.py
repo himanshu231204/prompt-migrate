@@ -1,4 +1,5 @@
 """PR 1: every command closes its SQLite connection, on success and on failure."""
+import json
 import sqlite3
 
 import pytest
@@ -64,7 +65,8 @@ def test_state_file_deletable_after_command(project, opened, command):
 
 def test_connection_closed_when_command_fails(project, opened):
     revision_file = next((project / ".promptmigrate" / "versions").glob("*.json"))
-    revision_file.write_bytes(revision_file.read_bytes() + b"\n")  # tamper after apply
+    item = json.loads(revision_file.read_bytes())
+    revision_file.write_text(json.dumps({**item, "message": "edited after apply"}), encoding="utf-8")  # tamper
     with pytest.raises(MigrationError, match="modified after apply"):
         check(project, "dev")
     assert_all_closed(opened)
