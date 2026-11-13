@@ -74,7 +74,7 @@ Basenames stay unique across directories, because pytest's default `prepend` imp
 - Interrupt at checkpoints and verify rollback/no partial ledger update.
 - Simulate SQLite busy lock, connection failure, malformed DB, no write permissions.
 - Concurrent `upgrade` processes cannot corrupt state; test busy/serialization behavior.
-- Truncated/modified applied revision bytes rejected.
+- Applied revision integrity follows its format: v0 byte changes are rejected; v1 formatting-only reserialization is accepted, while parsed-content changes are rejected.
 - Tampered current `prompts` table and unexpected extra prompt rejected.
 
 ### D. CLI contract tests

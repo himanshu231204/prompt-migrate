@@ -36,7 +36,7 @@ Flow: `load_revisions()` enforces one linear chain and replays it from `{}`. `re
 - Keep source history and applied env state distinct; fail closed on drift, corrupt history, unexpected state or partial writes.
 - Config and ledger change in one local SQLite transaction, with no LLM/provider calls inside it. No remote writes disguised as transactional migration.
 - Revisions are JSON only; no executable revision code.
-- Never change the revision format or checksum semantics without an explicit format version. Any byte change to an applied revision (including whitespace or CRLF) blocks that env.
+- Never change the revision format or checksum semantics without an explicit format version. Applied revision integrity is versioned: for v0, any byte change (including whitespace or CRLF) blocks that env; for v1, formatting-only changes are allowed, but any change to the canonical parsed content blocks that env.
 - `--env prod` is a local SQLite file; never claim real production deployment or production readiness from a green suite.
 - No secrets, credentials or user data in revisions, logs or fixtures. Tests build token-shaped values at runtime from fragments (`"sk-" + "0" * 24`); never commit a token-shaped literal.
 - Runtime stays stdlib-only; dev deps go in `[project.optional-dependencies] dev`. No AI-orchestration frameworks in core.
