@@ -19,10 +19,10 @@ State under `.promptmigrate/`: `drafts/<name>.json` (desired config); `versions/
 
 Flow: `load_revisions()` enforces one linear chain and replays it from `{}`. `revision()` diffs drafts against the replayed source head, never an env DB. `upgrade`/`downgrade` run `BEGIN IMMEDIATE` → `_verify()` (ledger is an exact (id, checksum) prefix of history and `prompts` equals `replay(prefix)`, else drift) → `_apply_changes()` re-checks preconditions → rows and ledger commit together. Checksums are SHA-256 of raw revision bytes. Downgrade deletes ledger rows; there is no audit log yet.
 
-## Verified baseline (2026-11-05)
+## Verified baseline (2026-11-13)
 
 - Shipped: `init`, `revision`, `history`, `diff`, `current`, `upgrade`, `downgrade`, `plan`, `check`, `get`, `env add`, `env list`; `--output json`; exit codes 0–5.
-- Windows 11 / Python 3.11.9: `python -m pytest -q` → `713 passed, 18 skipped, 33 warnings` (host symlink, case-insensitivity and POSIX-permission skips); unittest → `Ran 7 tests ... OK`. CI: Linux Docker plus native Windows and macOS, Python 3.10/3.12/3.13.
+- Windows 11 / Python 3.11.9: `python -m pytest -q` → `741 passed, 18 skipped, 1 xfailed, 33 warnings` (host symlink, case-insensitivity and POSIX-permission skips); unittest → `Ran 7 tests ... OK`. CI: Linux Docker plus native Windows and macOS, Python 3.10/3.12/3.13.
 - Not shipped (never claim otherwise): `eval`, `export`, `promote`, `reconcile`, cloud adapters, SDK, Postgres, RBAC, signed revisions, real production activation.
 
 ## Process
