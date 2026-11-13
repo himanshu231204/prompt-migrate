@@ -81,6 +81,10 @@ Handled errors are typed (`errors.py`); `output.py` maps them to the exit status
 keeps its pre-existing meaning, so scripts that only test for non-zero keep working. An unhandled exception still
 propagates as a Python traceback.
 
+Revision files with an unsupported `format_version` (`Unsupported format_version in <file>`) or, in a v1 file, an
+unknown top-level key (`Unknown top-level key in <file>: <keys>`) are `SchemaError`s and exit 3 (see
+`MIGRATION_PROTOCOL.md`, "v1 artifact").
+
 **Warnings:** each distinct warning is printed once per invocation to stderr as `Warning: <message>`, before any
 `Error: …` line. Warnings never change the exit code. Warnings come from existing revision files that break a tier-B
 rule (see `MIGRATION_PROTOCOL.md`, "Strict parsing and compatibility tiers") and from the secret safeguard (redaction,

@@ -69,7 +69,7 @@ PYTHONPATH=src python -m unittest discover -s tests -v
 | 2026-11-05 (after PR 6) | Windows 11, Python 3.11.9 | `python -m pytest -q` → `713 passed, 18 skipped, 33 warnings`; original unittest suite → `Ran 7 tests ... OK` |
 | 2026-11-13 (after PR 7) | Windows 11, Python 3.11.9 | `python -m pytest -q` → `741 passed, 18 skipped, 1 xfailed, 33 warnings`; original unittest suite → `Ran 7 tests ... OK` |
 
-Implemented there: `init`, `revision`, `diff`, `history`, `current`, `plan`, `upgrade`, `downgrade`, `check`, `get`, `env add`, and `env list`; Git-trackable JSON revisions and declared environment manifest; per-environment **local** SQLite files; read-only inspection; legacy manifest adoption; snapshots; checksums of raw migration files at apply time; state drift detection; one linear history; multi-prompt changes in one SQLite transaction.
+Implemented there: `init`, `revision`, `diff`, `history`, `current`, `plan`, `upgrade`, `downgrade`, `check`, `get`, `env add`, and `env list`; Git-trackable JSON revisions and declared environment manifest; per-environment **local** SQLite files; read-only inspection; legacy manifest adoption; snapshots; checksums at apply time (raw bytes for v0 revisions, canonical content for v1, ADR-026); state drift detection; one linear history; multi-prompt changes in one SQLite transaction.
 
 The Windows skips are host limits: symlinks/reparse points cannot be created by this account, case-colliding file names cannot coexist on its case-insensitive filesystem, and POSIX permission bits do not apply. GitHub Actions runs the full suite in Linux Docker containers and natively on Windows and macOS for Python 3.10, 3.12 and 3.13.
 

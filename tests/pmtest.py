@@ -26,8 +26,8 @@ def create(config=CFG) -> dict:
     return {"before": None, "after": config}
 
 
-def write_revision(project, rid, parent, changes, *, filename=None, message="m") -> Path:
-    """Write a revision file in the starter's v0 format, bypassing the generator."""
+def write_revision(project, rid, parent, changes, *, filename=None, message="m", format_version=None) -> Path:
+    """Write a revision file, bypassing the generator: v0 (no `format_version`) unless `format_version` is given."""
     item = {
         "revision": rid,
         "down_revision": parent,
@@ -35,6 +35,8 @@ def write_revision(project, rid, parent, changes, *, filename=None, message="m")
         "created_at": "2026-10-30T00:00:00+00:00",
         "changes": changes,
     }
+    if format_version is not None:
+        item["format_version"] = format_version
     path = pm_dir(project) / "versions" / f"{filename or rid}.json"
     path.write_text(pretty(item), encoding="utf-8")
     return path

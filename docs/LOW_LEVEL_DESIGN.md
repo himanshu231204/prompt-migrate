@@ -37,8 +37,9 @@ class Revision:
     message: str
     created_at: str              # ISO-8601 string
     changes: dict[str, Change]  # name -> before/after config
-    checksum: str                # SHA-256 of on-disk raw revision bytes (starter)
+    checksum: str                # v0: SHA-256 of raw file bytes; v1: "v1:" + SHA-256 of canonical JSON (ADR-026)
     path: Path
+    format_version: int          # 0 (no key) or 1
 
 @dataclass(frozen=True)
 class Change:
@@ -95,8 +96,7 @@ revision_checksum = sha256(path.read_bytes()).hexdigest()
 ```
 
 - JSON state comparison is **semantic object equality**.
-- Applied revision checksum is over **raw revision file bytes**; even whitespace-only edits invalidate an applied revision. This is conservative but important to document.
-- A future `format_version` can define canonical artifact hashing and signatures, **without silently changing validation of existing applied history**.
+- Applied revision checksum: v0 hashes the **raw file bytes**, so even whitespace-only edits invalidate an applied revision; v1 hashes the canonical parsed object, so only value changes do (ADR-026). Existing applied v0 history is never re-validated under v1 rules.
 
 ## 6. Revision loading and graph validation
 

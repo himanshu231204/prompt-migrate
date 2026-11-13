@@ -35,6 +35,7 @@
 
 - [ ] Freeze v0.x artifact semantics formally; protocol v1 with canonical revision hashes (fixes the CRLF false-tamper risk).
   - 2026-11-13: v0 semantics frozen and pinned by fixtures (ADR-025). Protocol v1 still open. Baseline after PR 7: 741 passed, 18 skipped, 1 xfailed.
+  - Protocol v1 reader and canonical checksum in place (ADR-026); the generator still writes v0.
 - [ ] Atomic revision file generation and collision handling.
 - [ ] `validate` command.
 - [ ] Concurrency tests and the fault-injection suite.

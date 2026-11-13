@@ -8,6 +8,13 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
 - Corrected README and handoff documentation to include the shipped `plan` command and native Windows/macOS CI coverage; refreshed the documented test baseline and suite location. Brought `PRD.md`, `ROADMAP.md` and `LOW_LEVEL_DESIGN.md` up to date with the shipped `plan`, exit codes, JSON output, typed errors and strict loader. Moved all agent rules and the architecture overview from `CLAUDE.md` into `AGENTS.md`.
 - Compacted `AGENTS.md` without dropping rules, and added a "Before every commit" rule: each commit updates `CHANGELOG.md` and `docs/ROADMAP.md`.
 
+### Phase 1 cycle 2 — protocol v1 and canonical revision hashes (PR 8)
+
+- Revision files with `"format_version": 1` are read as protocol v1 (ADR-026): exactly six top-level keys, and a
+  `v1:`-tagged SHA-256 of the canonical parsed object as checksum, so line endings, whitespace and key order no
+  longer count for them. Any other `format_version` value, or an unknown key in a v1 file, is a `SchemaError`
+  (exit 3). Files without `format_version` stay v0, unchanged.
+
 ### Phase 1 cycle 2 — freeze v0 artifact semantics (PR 7)
 
 - Recorded ADR-025: a revision file without `format_version` is v0, its meaning is frozen, and its checksum stays

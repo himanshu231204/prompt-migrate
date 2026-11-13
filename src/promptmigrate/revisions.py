@@ -12,6 +12,8 @@ from typing import Any
 from . import project, protocol
 from .errors import LegacyRevisionWarning, MigrationConflictError, RevisionGraphError, SchemaError
 
+_V0_KEYS = ("revision", "down_revision", "message", "created_at", "changes")
+_V1_KEYS = frozenset({"format_version", *_V0_KEYS})
 _LEGACY = "revision {rid}: {rule} (accepted for compatibility; create a new revision to fix)"
 
 
@@ -24,10 +26,28 @@ class Revision:
     changes: dict[str, dict[str, Any]]
     checksum: str
     path: Path
+    format_version: int = 0
 
 
 def _hash(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def _v1_checksum(item: dict[str, Any]) -> str:
+    """Protocol v1 (ADR-026): SHA-256 of the canonical JSON of the whole parsed file, tagged so it never equals v0."""
+    return "v1:" + _hash(protocol.canonical(item).encode("utf-8"))
+
+
+def _format_version(item: dict[str, Any], name: str) -> int:
+    """0 for a file without `format_version` (frozen, ADR-025), 1 for the JSON integer 1; anything else is tier A."""
+    if "format_version" not in item:
+        return 0
+    if type(item["format_version"]) is not int or item["format_version"] != 1:
+        raise SchemaError(f"Unsupported format_version in {name}")
+    unknown = sorted(set(item) - _V1_KEYS)
+    if unknown:
+        raise SchemaError(f"Unknown top-level key in {name}: {', '.join(unknown)}")
+    return 1
 
 
 def load_revisions(project_dir: Path) -> list[Revision]:
@@ -36,9 +56,10 @@ def load_revisions(project_dir: Path) -> list[Revision]:
     violations: dict[str, list[str]] = {}
     for path in sorted((root / "versions").glob("*.json")):
         item, raw, file_rules = protocol.load_json(path, kind="revision", root=root)
-        if not isinstance(item, dict) or not all(
-            k in item for k in ("revision", "down_revision", "message", "created_at", "changes")
-        ):
+        if not isinstance(item, dict):
+            raise SchemaError(f"Invalid migration format: {path.name}")
+        version = _format_version(item, path.name)
+        if not all(k in item for k in _V0_KEYS):
             raise SchemaError(f"Invalid migration format: {path.name}")
         rid, parent, changes = item["revision"], item["down_revision"], item["changes"]
         if not isinstance(rid, str) or not re.fullmatch(r"[a-f0-9]{12}", rid):
@@ -65,8 +86,9 @@ def load_revisions(project_dir: Path) -> list[Revision]:
             if change["after"] is not None:
                 found.extend(protocol.config_violations(name, change["after"]))
         violations[rid] = found
+        checksum = _hash(raw) if version == 0 else _v1_checksum(item)
         unsorted[rid] = Revision(
-            rid, parent, item["message"], item["created_at"], changes, _hash(raw), path
+            rid, parent, item["message"], item["created_at"], changes, checksum, path, version
         )
 
     if not unsorted:
