@@ -19,6 +19,8 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
   line endings (exit 4), but the message now says so and names `promptmigrate restamp --env <env>`.
 - `restamp` and the line-ending hint now apply only to UTF-8 v0 revision files; a UTF-16/32 file whose bytes happen
   to match after CR/LF replacement is no longer accepted.
+- Corrected the docs: `restamp` is not among the commands that reject an eligible line-ending-only row with exit 4 —
+  it re-stamps such a row and succeeds. The failing set is `check`, `current`, `get`, `plan`, `upgrade` and `downgrade`.
 - Recorded the post-PR 9 test baseline (854 passed, 18 skipped) and added `restamp` to the command lists.
 
 ### Phase 1 cycle 2 — protocol v1 and canonical revision hashes (PR 8)

@@ -88,8 +88,9 @@ unknown top-level key (`Unknown top-level key in <file>: <keys>`), or a string w
 "v1 artifact").
 
 A v0 revision whose file changed only in line endings after apply is still an `IntegrityError` (exit 4) in every
-command that verifies an environment (`check`, `current`, `get`, `plan`, `upgrade`, `downgrade`, `restamp`), with the
+command that verifies an environment (`check`, `current`, `get`, `plan`, `upgrade`, `downgrade`), with the
 message ``Migration file was modified after apply: <id> (line endings only; run `promptmigrate restamp --env <env>` to accept)``.
+`restamp` is the exception: it re-stamps the checksum of such a row and succeeds.
 
 **Warnings:** each distinct warning is printed once per invocation to stderr as `Warning: <message>`, before any
 `Error: …` line. Warnings never change the exit code. Warnings come from existing revision files that break a tier-B
