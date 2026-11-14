@@ -14,7 +14,7 @@ def check(project_dir: Path, env: str, require_head: bool = False) -> tuple[int,
     env = store.resolve_environment(project_dir, env)
     revisions_ = revisions.load_revisions(project_dir)
     with store.connect_readonly(project_dir, env) as db:
-        count = apply._verify(db, revisions_) if db is not None else 0
+        count = apply._verify(db, revisions_, env) if db is not None else 0
     if require_head and count != len(revisions_):
         raise PendingRevisionsError(f"Environment is behind head: {len(revisions_) - count} pending revisions")
     return count, len(revisions_)

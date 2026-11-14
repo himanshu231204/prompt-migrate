@@ -35,6 +35,8 @@
 
 - [x] Freeze v0.x artifact semantics formally; protocol v1 with canonical revision hashes (fixes the CRLF false-tamper risk for new revisions).
   - 2026-11-13: v0 frozen (ADR-025); protocol v1 with canonical checksums shipped, and new revisions are v1 with LF line endings (ADR-026). Baseline after PR 8: 802 passed, 18 skipped.
+  - 2026-11-13: explicit `restamp` for v0 ledger rows whose mismatch is line endings only (ADR-027). Baseline after PR 9: 854 passed, 18 skipped.
+  - 2026-11-14: review fix: `restamp` removed from the docs' list of commands that reject an eligible line-ending-only row with exit 4 (it re-stamps and succeeds). Baseline unchanged: 854 passed, 18 skipped.
 - [ ] Atomic revision file generation and collision handling.
 - [ ] `validate` command.
 - [ ] Concurrency tests and the fault-injection suite.
@@ -81,4 +83,4 @@ No SaaS dashboard, no visual prompt editor, no paid cloud control plane, no dire
 
 ## First next step
 
-Phase 1 cycle 2 is under way. Protocol v1 is shipped (ADR-026), so new revisions are immune to formatting-only changes; integrity guidance now reflects the separate v0 and v1 rules. Next: an explicit, opt-in `restamp` for v0 ledger rows whose mismatch is line endings only (v0 hash semantics unchanged). Use [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) and [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md), and keep to small tested PRs.
+Phase 1 cycle 2 is under way. Protocol v1 is shipped (ADR-026), so new revisions are immune to formatting-only changes; integrity guidance now reflects the separate v0 and v1 rules. `restamp`, an explicit, opt-in re-stamp of v0 ledger rows whose mismatch is line endings only, is shipped (ADR-027); v0 hash semantics are unchanged. Verifying commands name `restamp` when a mismatch is line endings only. Next: atomic revision file generation and collision handling. Use [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) and [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md), and keep to small tested PRs.

@@ -13,7 +13,7 @@ def downgrade(project_dir: Path, env: str, target: str = "-1") -> list[str]:
     revisions_ = revisions.load_revisions(project_dir)
     with store.connect_write(project_dir, env) as db:
         db.execute("BEGIN IMMEDIATE")
-        applied_count = apply._verify(db, revisions_)
+        applied_count = apply._verify(db, revisions_, env)
         target_count = plan.downgrade_count(revisions_, applied_count, target)
         reversed_revisions = plan.downgrade_steps(revisions_, applied_count, target_count)
         apply.migrate(db, reversed_revisions, backward=True)

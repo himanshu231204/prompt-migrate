@@ -14,7 +14,7 @@ def upgrade(project_dir: Path, env: str, target: str = "head") -> list[str]:
     target_count = plan.upgrade_count(revisions_, target)
     with store.connect_write(project_dir, env) as db:
         db.execute("BEGIN IMMEDIATE")
-        applied_count = apply._verify(db, revisions_)
+        applied_count = apply._verify(db, revisions_, env)
         steps = plan.upgrade_steps(revisions_, applied_count, target_count)
         apply.migrate(db, steps)
     store.adopt_environments(project_dir)

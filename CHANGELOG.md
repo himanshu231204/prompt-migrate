@@ -9,6 +9,20 @@ All notable changes to PromptMigrate. Before 1.0, CLI and file contracts may cha
 - Corrected README and handoff documentation to include the shipped `plan` command and native Windows/macOS CI coverage; refreshed the documented test baseline and suite location. Brought `PRD.md`, `ROADMAP.md` and `LOW_LEVEL_DESIGN.md` up to date with the shipped `plan`, exit codes, JSON output, typed errors and strict loader. Moved all agent rules and the architecture overview from `CLAUDE.md` into `AGENTS.md`.
 - Compacted `AGENTS.md` without dropping rules, and added a "Before every commit" rule: each commit updates `CHANGELOG.md` and `docs/ROADMAP.md`.
 
+### Phase 1 cycle 2 — line-ending recovery for v0 (`restamp`, PR 9)
+
+- Added `promptmigrate restamp --env <env>` (ADR-027): an explicit, all-or-nothing command that re-stamps the ledger
+  checksum of applied v0 revisions whose file changed only in line endings (CRLF ↔ LF). Any other mismatch, a v1 row,
+  or drift fails with the normal error and writes nothing; no state database or manifest is created. There is no
+  audit record of a re-stamp yet (cycle 3).
+- `check`, `current`, `get`, `plan`, `upgrade` and `downgrade` still fail a v0 revision whose file changed only in
+  line endings (exit 4), but the message now says so and names `promptmigrate restamp --env <env>`.
+- `restamp` and the line-ending hint now apply only to UTF-8 v0 revision files; a UTF-16/32 file whose bytes happen
+  to match after CR/LF replacement is no longer accepted.
+- Corrected the docs: `restamp` is not among the commands that reject an eligible line-ending-only row with exit 4 —
+  it re-stamps such a row and succeeds. The failing set is `check`, `current`, `get`, `plan`, `upgrade` and `downgrade`.
+- Recorded the post-PR 9 test baseline (854 passed, 18 skipped) and added `restamp` to the command lists.
+
 ### Phase 1 cycle 2 — protocol v1 and canonical revision hashes (PR 8)
 
 - **Contract:** Revision files with `"format_version": 1` are read as protocol v1 (ADR-026): exactly six top-level keys, and a

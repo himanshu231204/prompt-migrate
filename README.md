@@ -102,6 +102,7 @@ The tool generates a JSON revision like this (abbreviated):
 | `downgrade -1 --env dev` | Undo the last applied revision |
 | `downgrade base --env dev` | Revert all applied revisions |
 | `check --env dev --require-head` | Detect drift, tampered migration files, and pending changes |
+| `restamp --env dev` | Accept applied v0 revisions whose files changed only in line endings (CRLF ↔ LF); anything else still fails |
 | `get assistant --env dev` | Read a local environment's active prompt config |
 | `env add qa` | Declare a local environment without creating its database |
 | `env list` | List declared environments and whether local state exists |

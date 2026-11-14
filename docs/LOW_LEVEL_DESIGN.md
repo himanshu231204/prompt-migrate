@@ -40,6 +40,7 @@ class Revision:
     checksum: str                # v0: SHA-256 of raw file bytes; v1: "v1:" + SHA-256 of canonical JSON (ADR-026)
     path: Path
     format_version: int          # 0 (no key) or 1
+    line_ending_checksums: frozenset[str]  # v0 only: raw-byte digests of the LF and CRLF re-saves (ADR-027)
 
 @dataclass(frozen=True)
 class Change:
@@ -98,6 +99,7 @@ revision_checksum = "v1:" + sha256(canonical(item).encode("utf-8")).hexdigest() 
 
 - JSON state comparison is **semantic object equality**.
 - Applied revision checksum: v0 hashes the **raw file bytes**, so even whitespace-only edits invalidate an applied revision; v1 hashes the canonical parsed object, so only value changes do (ADR-026). Existing applied v0 history is never re-validated under v1 rules.
+- Line-ending recovery: `restamp` replaces a v0 ledger checksum with the current raw digest only when the stored value is one of the file's `line_ending_checksums`; every other mismatch still fails closed, and the v0 checksum is never recomputed differently (ADR-027).
 
 ## 6. Revision loading and graph validation
 

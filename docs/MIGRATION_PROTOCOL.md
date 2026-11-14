@@ -170,8 +170,11 @@ A revision file without `format_version` is v0. Its semantics are frozen (ADR-02
   that environment with "Migration file was modified after apply"
 
 Known risk: before protocol v1 the generator wrote the platform's line ending, so a v0 revision created and applied on
-Windows can fail `check` after Git normalises it to LF. New revisions are v1 and are not affected. An explicit
-recovery for such v0 ledger rows is planned (`restamp`, not implemented).
+Windows can fail `check` after Git normalises it to LF. New revisions are v1 and are not affected. For such v0 rows,
+`promptmigrate restamp --env <env>` is the explicit recovery (ADR-027). It re-stamps the ledger checksum of each
+applied v0 revision whose stored digest equals its current file normalised to all-LF or all-CRLF, computed only for
+a UTF-8 file, and it fails closed, writing nothing, on any other mismatch, including a non-UTF-8 v0 file. The v0
+checksum itself does not change, and no other command accepts a line-ending change.
 
 ## v1 artifact
 
@@ -196,6 +199,10 @@ A revision file whose top-level `format_version` is the JSON integer `1` is v1 (
 `upgrade` and `downgrade` store each applied revision's checksum in the environment's `applied_revisions` ledger.
 Every command that verifies an environment compares the ledger, row by row, with the checksums of the current source
 files. A mismatch is `IntegrityError` "Migration file was modified after apply: <id>" (exit 4).
+
+When a v0 row's stored digest equals the current file re-saved with LF or with CRLF, the error and exit code are the
+same and the message ends `` (line endings only; run `promptmigrate restamp --env <env>` to accept)``. Nothing is
+accepted until `restamp` runs (see "v0 artifact (frozen)").
 
 | Format | Ledger value | A mismatch after apply means |
 |---|---|---|

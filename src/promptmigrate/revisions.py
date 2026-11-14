@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import warnings
 from dataclasses import dataclass
@@ -27,10 +28,17 @@ class Revision:
     checksum: str
     path: Path
     format_version: int = 0
+    line_ending_checksums: frozenset[str] = frozenset()  # v0 only: raw-byte digests of the LF and CRLF re-saves
 
 
 def _hash(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def line_ending_variants(raw: bytes) -> set[str]:
+    """Raw-byte digests of `raw` re-saved with LF and with CRLF line endings (ADR-027). The v0 checksum is unchanged."""
+    lf = raw.replace(b"\r\n", b"\n")
+    return {_hash(lf), _hash(lf.replace(b"\n", b"\r\n"))}
 
 
 def _v1_checksum(item: dict[str, Any]) -> str:
@@ -86,15 +94,26 @@ def load_revisions(project_dir: Path) -> list[Revision]:
             if change["after"] is not None:
                 found.extend(protocol.config_violations(name, change["after"]))
         violations[rid] = found
+        variants: frozenset[str] = frozenset()
         if version == 0:
             checksum = _hash(raw)
+            # CR/LF bytes (b"\r\n") are only ever whitespace in UTF-8 JSON. `json.loads` also auto-detects and
+            # accepts UTF-16/32, where a single code unit such as U+0D0A encodes as the same two bytes as a byte-
+            # level CR LF; replacing it would treat a real value change as a line-ending-only edit (Finding 1,
+            # 2026-11-13 final review). `raw.decode("utf-8")` alone is not a reliable test here: a mostly-ASCII
+            # UTF-16 file is full of null bytes, which are themselves valid (if meaningless) UTF-8, so it can
+            # decode without error even though `json.loads` did not read it as UTF-8. Ask the same question
+            # `json.loads` asks of these bytes (`json.detect_encoding`, the encoding-sniffing it uses for bytes
+            # input) instead, so "UTF-8" here means what it means to the loader, with or without a BOM.
+            if json.detect_encoding(raw) in ("utf-8", "utf-8-sig"):
+                variants = frozenset(line_ending_variants(raw))
         else:
             try:
                 checksum = _v1_checksum(item)
             except UnicodeEncodeError as exc:
                 raise SchemaError(f"Invalid string in {path.name}: unpaired surrogate") from exc
         unsorted[rid] = Revision(
-            rid, parent, item["message"], item["created_at"], changes, checksum, path, version
+            rid, parent, item["message"], item["created_at"], changes, checksum, path, version, variants
         )
 
     if not unsorted:
