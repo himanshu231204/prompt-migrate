@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Documentation
+- **ADR-030 `rebase`** — accepted the design for `promptmigrate rebase` (#15): re-parent an unapplied branch after a Git merge with new ids, written as v1, refusing applied revisions and conflicting prompts; docs only, `rebase` is not implemented
 - **README** — explain recovery from line-ending drift (#104)
 
 - **Roadmap** — records that `promptmigrate-cli` 0.1.0 is published on PyPI (#55); the documented upgrade policy (#56) remains open
